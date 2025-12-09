@@ -100,20 +100,18 @@ fun AlarmRingingScreen(onDismiss: () -> Unit) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Dismiss button
             Button(
                 onClick = onDismiss,
                 modifier = Modifier
-                    .width(250.dp)
-                    .height(70.dp),
+                    .fillMaxWidth()
+                    .height(64.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color(0xFFFF6B6B)
+                    containerColor = Color(0xFFE53935)
                 )
             ) {
                 Text(
                     text = "DISMISS",
-                    fontSize = 24.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
             }

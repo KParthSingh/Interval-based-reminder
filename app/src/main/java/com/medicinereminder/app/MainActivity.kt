@@ -319,6 +319,58 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // Start All Chain button
+        if (alarms.isNotEmpty()) {
+            val anyActive = alarms.any { it.isActive }
+            val chainManager = remember { ChainManager(context) }
+            
+            Button(
+                onClick = {
+                    // Start chain mode - only schedule the FIRST alarm
+                    // Rest will be triggered when each one is dismissed
+                    chainManager.startChain()
+                    
+                    val firstAlarm = alarms[0]
+                    val delayMillis = firstAlarm.getTotalSeconds() * 1000L
+                    
+                    // Schedule only the first alarm
+                    onScheduleAlarm(delayMillis, 1)
+                    
+                    // Update only first alarm state, mark rest as pending
+                    alarms = alarms.toMutableList().apply {
+                        set(0, firstAlarm.copy(
+                            isActive = true,
+                            scheduledTime = System.currentTimeMillis() + delayMillis
+                        ))
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF03DAC5)
+                )
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Start Chain (Sequential)",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${alarms.size} alarms • Each starts after previous",
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                }
+            }
+        }
     }
 }
 
