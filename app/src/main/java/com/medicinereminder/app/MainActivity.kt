@@ -239,6 +239,9 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                             }
                             context.startService(intent)
                             android.util.Log.d("MainActivity", "Stop intent sent")
+                            
+                            // Also clear all active alarms
+                            alarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
                         }
                     )
                 }

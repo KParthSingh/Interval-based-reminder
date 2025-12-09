@@ -64,7 +64,7 @@ class ChainService : Service() {
         // Ensure we are in foreground
         try {
              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
             } else {
                 startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
             }
@@ -149,6 +149,13 @@ class ChainService : Service() {
                 alarmScheduler.cancelAlarm(requestCode)
                 
                 ChainManager(this).stopChain()
+                
+                // Clear all active alarms in the repository
+                val repository = AlarmRepository(this)
+                val alarms = repository.loadAlarms()
+                val clearedAlarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
+                repository.saveAlarms(clearedAlarms)
+                Log.d("ChainService", "All alarms cleared")
                 
                 Log.d("ChainService", "After stop - ChainActive: ${ChainManager(this).isChainActive()}")
                 
