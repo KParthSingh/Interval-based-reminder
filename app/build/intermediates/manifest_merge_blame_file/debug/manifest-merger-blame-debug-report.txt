@@ -49,7 +49,7 @@
 26-->[androidx.core:core:1.12.0] C:\Users\Om Singh\.gradle\caches\9.0-milestone-1\transforms\102bb4ca6e8b3e009636483291d8df3f\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
 27
 28    <application
-28-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:16:5-101:19
+28-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:16:5-102:19
 29        android:allowBackup="true"
 29-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:17:9-35
 30        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
@@ -184,11 +184,11 @@
 103-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:87:17-46
 104        </service>
 105
-106        <!-- Countdown Service -->
+106        <!-- Chain Service for managing alarm sequences -->
 107        <service
 107-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:91:9-99:19
-108            android:name="com.medicinereminder.app.CountdownService"
-108-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:92:13-45
+108            android:name="com.medicinereminder.app.ChainService"
+108-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:92:13-41
 109            android:enabled="true"
 109-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:93:13-35
 110            android:exported="false"
@@ -199,7 +199,7 @@
 112-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:85:13-87:49
 113                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
 113-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:86:17-76
-114                android:value="Alarm countdown" />
+114                android:value="Alarm chain countdown" />
 114-->C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:87:17-46
 115        </service>
 116

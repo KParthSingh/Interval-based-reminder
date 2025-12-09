@@ -87,16 +87,17 @@
                 android:value="Alarm ringing" />
         </service>
 
-        <!-- Countdown Service -->
+        <!-- Chain Service for managing alarm sequences -->
         <service
-            android:name=".CountdownService"
+            android:name=".ChainService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Alarm countdown" />
+                android:value="Alarm chain countdown" />
         </service>
+
 
     </application>
 

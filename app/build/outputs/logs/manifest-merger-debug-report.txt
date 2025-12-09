@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:2:1-103:12
-INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:2:1-103:12
-INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:2:1-103:12
-INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:2:1-103:12
+ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:2:1-104:12
+INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:2:1-104:12
+INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:2:1-104:12
+INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:2:1-104:12
 MERGED from [androidx.compose.material3:material3:1.1.2] C:\Users\Om Singh\.gradle\caches\9.0-milestone-1\transforms\60eab7341c78544bd82b011ee26f7080\transformed\material3-1.1.2\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.activity:activity:1.8.2] C:\Users\Om Singh\.gradle\caches\9.0-milestone-1\transforms\702982ca37bf2e005697079bb1d08c67\transformed\activity-1.8.2\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.activity:activity-ktx:1.8.2] C:\Users\Om Singh\.gradle\caches\9.0-milestone-1\transforms\ebb99dece511de7269506a95ceb3921a\transformed\activity-ktx-1.8.2\AndroidManifest.xml:2:1-7:12
@@ -97,8 +97,8 @@ ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\s
 	android:name
 		ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:14:22-86
 application
-ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:16:5-101:19
-INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:16:5-101:19
+ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:16:5-102:19
+INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:16:5-102:19
 MERGED from [androidx.compose.ui:ui-test-manifest:1.5.4] C:\Users\Om Singh\.gradle\caches\9.0-milestone-1\transforms\d1b5ac7c04932e440e8fcb69f74aeeca\transformed\ui-test-manifest-1.5.4\AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-test-manifest:1.5.4] C:\Users\Om Singh\.gradle\caches\9.0-milestone-1\transforms\d1b5ac7c04932e440e8fcb69f74aeeca\transformed\ui-test-manifest-1.5.4\AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.5.4] C:\Users\Om Singh\.gradle\caches\9.0-milestone-1\transforms\a168a89cbfd6ca28487f233655824a11\transformed\ui-tooling-release\AndroidManifest.xml:22:5-26:19
@@ -233,7 +233,7 @@ ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\s
 		ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:87:17-46
 	android:name
 		ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:86:17-76
-service#com.medicinereminder.app.CountdownService
+service#com.medicinereminder.app.ChainService
 ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:91:9-99:19
 	android:enabled
 		ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:93:13-35
@@ -242,7 +242,7 @@ ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\s
 	android:foregroundServiceType
 		ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:95:13-55
 	android:name
-		ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:92:13-45
+		ADDED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml:92:13-41
 uses-sdk
 INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from C:\Users\Om Singh\.gemini\antigravity\scratch\medicine-reminder\app\src\main\AndroidManifest.xml

@@ -14,6 +14,11 @@ class AlarmScheduler(private val context: Context) {
     private val prefs = context.getSharedPreferences("AlarmPrefs", Context.MODE_PRIVATE)
 
     fun scheduleAlarm(delayMillis: Long, requestCode: Int = 0) {
+        Log.d("AlarmScheduler", "=========================================")
+        Log.d("AlarmScheduler", "scheduleAlarm() called")
+        Log.d("AlarmScheduler", "  RequestCode: $requestCode")
+        Log.d("AlarmScheduler", "  Delay: ${delayMillis}ms (${delayMillis/1000}s)")
+        
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = "com.medicinereminder.app.ALARM_TRIGGERED"
             putExtra("REQUEST_CODE", requestCode)
@@ -27,6 +32,7 @@ class AlarmScheduler(private val context: Context) {
         )
 
         val triggerTime = System.currentTimeMillis() + delayMillis
+        Log.d("AlarmScheduler", "  Trigger time: $triggerTime (now: ${System.currentTimeMillis()})")
 
         // Store the scheduled time
         prefs.edit().putLong("alarm_time_$requestCode", triggerTime).apply()
@@ -46,9 +52,11 @@ class AlarmScheduler(private val context: Context) {
                     pendingIntent
                 )
             }
-            Log.d("AlarmScheduler", "Alarm scheduled for ${delayMillis}ms from now (request code: $requestCode)")
+            Log.d("AlarmScheduler", "✓ Alarm scheduled successfully")
+            Log.d("AlarmScheduler", "=========================================")
         } catch (e: SecurityException) {
-            Log.e("AlarmScheduler", "Permission denied for exact alarms", e)
+            Log.e("AlarmScheduler", "✗ Permission denied for exact alarms", e)
+            Log.d("AlarmScheduler", "=========================================")
         }
     }
 
@@ -61,6 +69,13 @@ class AlarmScheduler(private val context: Context) {
     }
 
     fun cancelAlarm(requestCode: Int = 0) {
+        Log.d("AlarmScheduler", "=========================================")
+        Log.d("AlarmScheduler", "cancelAlarm() called")
+        Log.d("AlarmScheduler", "  RequestCode: $requestCode")
+        
+        val wasScheduled = prefs.contains("alarm_time_$requestCode")
+        Log.d("AlarmScheduler", "  Was alarm scheduled: $wasScheduled")
+        
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = "com.medicinereminder.app.ALARM_TRIGGERED"
         }
@@ -73,8 +88,12 @@ class AlarmScheduler(private val context: Context) {
         )
 
         alarmManager.cancel(pendingIntent)
+        Log.d("AlarmScheduler", "  AlarmManager.cancel() called")
+        
         prefs.edit().remove("alarm_time_$requestCode").apply()
-        Log.d("AlarmScheduler", "Alarm cancelled (request code: $requestCode)")
+        Log.d("AlarmScheduler", "  Stored time removed from prefs")
+        Log.d("AlarmScheduler", "✓ Alarm canceled")
+        Log.d("AlarmScheduler", "=========================================")
     }
 
     fun canScheduleExactAlarms(): Boolean {

@@ -215,20 +215,65 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                         totalAlarms = alarms.size,
                         currentAlarm = alarms[currentChainIndex],
                         onPause = {
+                            android.util.Log.d("MainActivity", "PAUSE button clicked! Sending ACTION_PAUSE_CHAIN intent")
                             val intent = Intent(context, ChainService::class.java).apply {
                                 action = ChainService.ACTION_PAUSE_CHAIN
                             }
                             context.startService(intent)
+                            android.util.Log.d("MainActivity", "Pause intent sent, result: success")
                         },
                         onResume = {
+                            android.util.Log.d("MainActivity", "RESUME button clicked! Sending ACTION_RESUME_CHAIN intent")
                             val intent = Intent(context, ChainService::class.java).apply {
                                 action = ChainService.ACTION_RESUME_CHAIN
                             }
                             context.startService(intent)
+                            android.util.Log.d("MainActivity", "Resume intent sent")
                         },
                         isPaused = isPaused,
-                        pausedData = if(isPaused) chainManager.getPausedRemainingTime() else 0L
+                        pausedData = if(isPaused) chainManager.getPausedRemainingTime() else 0L,
+                        onStop = {
+                            android.util.Log.d("MainActivity", "STOP button clicked! Sending ACTION_STOP_CHAIN intent")
+                            val intent = Intent(context, ChainService::class.java).apply {
+                                action = ChainService.ACTION_STOP_CHAIN
+                            }
+                            context.startService(intent)
+                            android.util.Log.d("MainActivity", "Stop intent sent")
+                        }
                     )
+                }
+            } else if (alarms.isNotEmpty()) {
+                // Persistent Start Button at bottom
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 2.dp,
+                    shadowElevation = 8.dp
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                         val anyActive = alarms.any { it.isActive }
+                         Button(
+                            onClick = {
+                                chainManager.startChain()
+                                val firstAlarm = alarms[0]
+                                val delay = firstAlarm.getTotalSeconds() * 1000L
+                                onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size)
+                                alarms = alarms.toMutableList().apply {
+                                    set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
+                                }
+                            },
+                            enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(stringResource(R.string.start_chain_btn), fontWeight = FontWeight.Bold)
+                                Text(
+                                    stringResource(R.string.start_chain_subtitle, alarms.size),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -296,32 +341,7 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
             }
 
             // START CHAIN BUTTON (Sticky bottom if not empty)
-            if (alarms.isNotEmpty() && !isChainActive) {
-                Spacer(modifier = Modifier.height(8.dp))
-                val anyActive = alarms.any { it.isActive }
-                Button(
-                    onClick = {
-                        chainManager.startChain()
-                        val firstAlarm = alarms[0]
-                        val delay = firstAlarm.getTotalSeconds() * 1000L
-                        onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size)
-                        alarms = alarms.toMutableList().apply {
-                            set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
-                        }
-                    },
-                    enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(stringResource(R.string.start_chain_btn), fontWeight = FontWeight.Bold)
-                        Text(
-                            stringResource(R.string.start_chain_subtitle, alarms.size),
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                }
-            }
+
         }
     }
 }
@@ -358,6 +378,7 @@ fun StickyChainBar(
     currentAlarm: Alarm,
     onPause: () -> Unit,
     onResume: () -> Unit,
+    onStop: () -> Unit,
     isPaused: Boolean,
     pausedData: Long
 ) {
@@ -397,21 +418,36 @@ fun StickyChainBar(
                     )
                 }
                 
-                Button(
-                    onClick = { if (isPaused) onResume() else onPause() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isPaused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = if (isPaused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Icon(
-                        if (isPaused) Icons.Default.PlayArrow else androidx.compose.material.icons.Icons.Default.Info, // Placeholder for Pause if needed, but Text is clearer
-                        contentDescription = null, // decorative
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (isPaused) "RESUME" else "PAUSE")
+                Row {
+                    Button(
+                        onClick = { if (isPaused) onResume() else onPause() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isPaused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = if (isPaused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Icon(
+                            if (isPaused) Icons.Default.PlayArrow else androidx.compose.material.icons.Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (isPaused) "RESUME" else "PAUSE")
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Button(
+                        onClick = onStop,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Text("STOP")
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -505,8 +541,18 @@ fun AlarmItem(
                     )
                 }
                 
+                
                 if (alarm.isActive) {
-                    val remaining = ((alarm.scheduledTime - System.currentTimeMillis()) / 1000).toInt()
+                    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+                    
+                    LaunchedEffect(alarm.isActive) {
+                        while (alarm.isActive) {
+                            currentTime = System.currentTimeMillis()
+                            delay(1000)
+                        }
+                    }
+                    
+                    val remaining = ((alarm.scheduledTime - currentTime) / 1000).toInt()
                     if (remaining > 0) {
                         Text(
                             "⏱️ ${formatTime(remaining)}",
@@ -516,6 +562,7 @@ fun AlarmItem(
                         )
                     }
                 }
+
                 
                 IconButton(onClick = { expanded = !expanded }) {
                     Icon(

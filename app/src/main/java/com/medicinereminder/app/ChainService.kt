@@ -121,36 +121,110 @@ class ChainService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("ChainService", "============================================")
+        Log.d("ChainService", "onStartCommand received! Action: ${intent?.action}")
+        Log.d("ChainService", "Current state - Index: $currentIndex, EndTime: $endTime")
+        Log.d("ChainService", "ChainManager state - Active: ${ChainManager(this).isChainActive()}, Paused: ${ChainManager(this).isChainPaused()}")
+        
         when (intent?.action) {
             ACTION_START_CHAIN_ALARM -> {
+                Log.d("ChainService", ">>> ACTION_START_CHAIN_ALARM received")
                 endTime = intent.getLongExtra(EXTRA_END_TIME, 0)
                 currentIndex = intent.getIntExtra(EXTRA_CURRENT_INDEX, 0)
                 totalAlarms = intent.getIntExtra(EXTRA_TOTAL_ALARMS, 0)
                 currentAlarmName = intent.getStringExtra(EXTRA_ALARM_NAME) ?: ""
+                Log.d("ChainService", "Starting countdown for alarm $currentIndex/$totalAlarms, ends at $endTime")
                 startCountdown()
             }
             ACTION_STOP_CHAIN -> {
+                Log.d("ChainService", ">>> ACTION_STOP_CHAIN received")
+                Log.d("ChainService", "Before stop - ChainActive: ${ChainManager(this).isChainActive()}")
+                
+                // CRITICAL: Cancel the scheduled AlarmManager alarm!
+                val alarmScheduler = AlarmScheduler(this)
+                val currentIdx = ChainManager(this).getCurrentIndex()
+                val requestCode = currentIdx + 1
+                Log.d("ChainService", "Canceling AlarmManager alarm with requestCode: $requestCode")
+                alarmScheduler.cancelAlarm(requestCode)
+                
+                ChainManager(this).stopChain()
+                
+                Log.d("ChainService", "After stop - ChainActive: ${ChainManager(this).isChainActive()}")
+                
+                // Also ensure any ringing alarm service is stopped directly
+                val stopAlarmIntent = Intent(this, AlarmService::class.java)
+                stopService(stopAlarmIntent)
+                Log.d("ChainService", "AlarmService stop requested")
+                
+                // Dismiss alarm notification if any
+                val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
+                Log.d("ChainService", "Notification canceled")
+                
+                Log.d("ChainService", "Calling stopSelf()...")
                 stopSelf()
             }
-            ACTION_PAUSE_CHAIN -> handlePause()
-            ACTION_RESUME_CHAIN -> handleResume()
+            ACTION_PAUSE_CHAIN -> {
+                Log.d("ChainService", ">>> ACTION_PAUSE_CHAIN received")
+                handlePause()
+            }
+            ACTION_RESUME_CHAIN -> {
+                Log.d("ChainService", ">>> ACTION_RESUME_CHAIN received")
+                handleResume()
+            }
+            else -> {
+                Log.w("ChainService", "Unknown action received: ${intent?.action}")
+            }
         }
+        Log.d("ChainService", "============================================")
         return START_NOT_STICKY
     }
 
     private fun handlePause() {
+        Log.d("ChainService", "handlePause() called")
+        Log.d("ChainService", "Canceling countdown job...")
         countdownJob?.cancel()
+        
+        // CRITICAL: Cancel the scheduled AlarmManager alarm!
+        val alarmScheduler = AlarmScheduler(this)
+        val requestCode = currentIndex + 1
+        Log.d("ChainService", "Canceling AlarmManager alarm with requestCode: $requestCode")
+        alarmScheduler.cancelAlarm(requestCode)
+        
         val remaining = ((endTime - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+        Log.d("ChainService", "Remaining time: ${remaining}s (${remaining * 1000}ms)")
+        
+        Log.d("ChainService", "Before pause - isPaused: ${ChainManager(this).isChainPaused()}")
         ChainManager(this).pauseChain(remaining * 1000)
+        Log.d("ChainService", "After pause - isPaused: ${ChainManager(this).isChainPaused()}")
+        Log.d("ChainService", "Saved remaining time: ${ChainManager(this).getPausedRemainingTime()}ms")
+        
         showPausedNotification()
+        Log.d("ChainService", "Pause complete")
     }
 
     private fun handleResume() {
-        val remainingTimeStr = ChainManager(this).getPausedRemainingTime()
+        Log.d("ChainService", "handleResume() called")
+        val remainingTimeMs = ChainManager(this).getPausedRemainingTime()
+        Log.d("ChainService", "Retrieved paused remaining time: ${remainingTimeMs}ms")
+        
+        // CRITICAL: Reschedule the AlarmManager alarm with remaining time!
+        val alarmScheduler = AlarmScheduler(this)
+        val requestCode = currentIndex + 1
+        Log.d("ChainService", "Rescheduling AlarmManager alarm with requestCode: $requestCode, delay: ${remainingTimeMs}ms")
+        alarmScheduler.scheduleAlarm(remainingTimeMs, requestCode)
+        
         // Reset end time relative to now
-        endTime = System.currentTimeMillis() + remainingTimeStr
+        endTime = System.currentTimeMillis() + remainingTimeMs
+        Log.d("ChainService", "New endTime calculated: $endTime")
+        
+        Log.d("ChainService", "Before resume - isPaused: ${ChainManager(this).isChainPaused()}")
         ChainManager(this).resumeChain()
+        Log.d("ChainService", "After resume - isPaused: ${ChainManager(this).isChainPaused()}")
+        
+        Log.d("ChainService", "Restarting countdown...")
         startCountdown()
+        Log.d("ChainService", "Resume complete")
     }
 
     private fun showPausedNotification() {
