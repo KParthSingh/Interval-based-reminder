@@ -5,26 +5,76 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
 object NotificationHelper {
     const val CHANNEL_ID = "medicine_reminder_channel"
     const val NOTIFICATION_ID = 1001
-    const val COUNTDOWN_NOTIFICATION_ID = 1002
+    const val CHAIN_NOTIFICATION_ID = 1003
 
+    // ... existing methods ...
+
+    fun buildChainNotification(
+        context: Context,
+        currentStep: Int,
+        totalSteps: Int,
+        remainingSeconds: Int,
+        nextAlarmName: String
+    ): android.app.Notification {
+        val stopIntent = Intent(context, ChainService::class.java).apply {
+            action = ChainService.ACTION_STOP_CHAIN
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            context,
+            3,
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val hours = remainingSeconds / 3600
+        val minutes = (remainingSeconds % 3600) / 60
+        val seconds = remainingSeconds % 60
+        
+        val timeText = if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, seconds)
+                       else if (minutes > 0) String.format("%d:%02d", minutes, seconds)
+                       else "${seconds}s"
+
+        val title = "Sequence: $currentStep of $totalSteps"
+        val content = "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"} in $timeText"
+
+        return NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setPriority(NotificationCompat.PRIORITY_LOW) // Low priority for ongoing silent notification
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setAutoCancel(false)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setColor(Color.parseColor("#6750A4"))
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                "STOP SEQUENCE",
+                stopPendingIntent
+            )
+            .build()
+    }
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = context.getString(R.string.notification_channel_name)
             val descriptionText = context.getString(R.string.notification_channel_description)
-            val importance = NotificationManager.IMPORTANCE_HIGH // Changed from DEFAULT
+            val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
                 description = descriptionText
-                setSound(null, null) // We handle sound in the service
+                setSound(null, null) 
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 500, 200, 500)
-                setBypassDnd(true) // Bypass Do Not Disturb
+                enableLights(true)
+                lightColor = Color.MAGENTA
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setBypassDnd(true)
             }
 
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -44,7 +94,6 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Create Stop action
         val stopIntent = Intent(context, AlarmStopReceiver::class.java).apply {
             action = "com.medicinereminder.app.STOP_ALARM"
         }
@@ -55,22 +104,21 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Get scheduled time from preferences
         val prefs = context.getSharedPreferences("AlarmPrefs", Context.MODE_PRIVATE)
         val scheduledTime = prefs.getLong("alarm_time_1", 0)
         val timeText = if (scheduledTime > 0) {
-            val sdf = java.text.SimpleDateFormat("h:mm:ss a", java.util.Locale.getDefault())
+            val sdf = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
             sdf.format(java.util.Date(scheduledTime))
         } else {
             "Now"
         }
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("⏰ ALARM RINGING!")
-            .setContentText("Scheduled for $timeText")
+            .setContentTitle("⏰ " + context.getString(R.string.alarm_ringing))
+            .setContentText(context.getString(R.string.alarm_ringing_subtitle))
             .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("Time to take your medicine!\n\nScheduled: $timeText\n\nTap 'STOP' to dismiss the alarm."))
+                .bigText("${context.getString(R.string.alarm_ringing_subtitle)}\n\nScheduled for: $timeText"))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(false)
@@ -78,16 +126,14 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .setFullScreenIntent(pendingIntent, true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColor(Color.parseColor("#6750A4")) // Match app primary color
             .addAction(
                 android.R.drawable.ic_delete,
-                "STOP",
+                "SNOOZE / STOP", // Clearer action text
                 stopPendingIntent
             )
-        
-        // Add vibration pattern for heads-up notification
-        builder.setVibrate(longArrayOf(0, 500, 200, 500))
-        
-        return builder.build()
+            .setVibrate(longArrayOf(0, 500, 200, 500))
+            .build()
     }
 
     fun buildServiceNotification(context: Context): android.app.Notification {
@@ -97,49 +143,9 @@ object NotificationHelper {
             .setContentText(context.getString(R.string.alarm_service_notification))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
+            .setColor(Color.parseColor("#6750A4"))
             .build()
     }
 
-    fun buildCountdownNotification(context: Context, remainingSeconds: Int): android.app.Notification {
-        // Create cancel action
-        val cancelIntent = Intent(context, CountdownService::class.java).apply {
-            action = CountdownService.ACTION_CANCEL_ALARM
-        }
-        val cancelPendingIntent = PendingIntent.getService(
-            context,
-            2,
-            cancelIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
 
-        val hours = remainingSeconds / 3600
-        val minutes = (remainingSeconds % 3600) / 60
-        val seconds = remainingSeconds % 60
-        
-        val timeText = if (hours > 0) {
-            String.format("%d:%02d:%02d", hours, minutes, seconds)
-        } else if (minutes > 0) {
-            String.format("%d:%02d", minutes, seconds)
-        } else {
-            "${seconds}s"
-        }
-
-        return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("⏱️ Alarm Countdown")
-            .setContentText("Alarm in $timeText")
-            .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("Alarm will ring in $timeText\n\nTap CANCEL to stop the alarm."))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setAutoCancel(false) // Cannot be dismissed by tapping
-            .setOngoing(true) // Cannot be swiped away
-            .setOnlyAlertOnce(true) // Don't make sound/vibration on updates
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "CANCEL",
-                cancelPendingIntent
-            )
-            .build()
-    }
 }

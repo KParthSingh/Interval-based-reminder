@@ -23,10 +23,6 @@ class AlarmReceiver : BroadcastReceiver() {
         wakeLock.acquire(10 * 60 * 1000L) // 10 minutes max
 
         try {
-            // Stop countdown service if running
-            val countdownServiceIntent = Intent(context, CountdownService::class.java)
-            context.stopService(countdownServiceIntent)
-            
             // Start foreground service (it will show the notification with STOP button)
             val serviceIntent = Intent(context, AlarmService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

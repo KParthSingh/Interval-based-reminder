@@ -17,9 +17,11 @@ class AlarmStopReceiver : BroadcastReceiver() {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
             
-            // Stop countdown service from previous alarm
-            val stopCountdownIntent = Intent(context, CountdownService::class.java)
-            context.stopService(stopCountdownIntent)
+            // Stop ChainService if running (it might be running for countdown)
+            val stopChainServiceIntent = Intent(context, ChainService::class.java).apply {
+                action = ChainService.ACTION_STOP_CHAIN
+            }
+            context.startService(stopChainServiceIntent)
             
             // Check if we're in a chain and need to start the next alarm
             val chainManager = ChainManager(context)
@@ -35,21 +37,30 @@ class AlarmStopReceiver : BroadcastReceiver() {
                     // Start the next alarm in the chain
                     val nextAlarm = alarms[nextIndex]
                     val delayMillis = nextAlarm.getTotalSeconds() * 1000L
+                    val endTime = System.currentTimeMillis() + delayMillis
                     
                     val alarmScheduler = AlarmScheduler(context)
                     alarmScheduler.scheduleAlarm(delayMillis, nextIndex + 1)
                     
-                    // Start countdown service for next alarm (after stopping the old one)
-                    val countdownIntent = Intent(context, CountdownService::class.java).apply {
-                        putExtra("triggerTime", System.currentTimeMillis() + delayMillis)
+                    // Start ChainService for next alarm
+                    val chainIntent = Intent(context, ChainService::class.java).apply {
+                        action = ChainService.ACTION_START_CHAIN_ALARM
+                        putExtra(ChainService.EXTRA_END_TIME, endTime)
+                        putExtra(ChainService.EXTRA_CURRENT_INDEX, nextIndex)
+                        putExtra(ChainService.EXTRA_TOTAL_ALARMS, alarms.size)
+                        putExtra(ChainService.EXTRA_ALARM_NAME, nextAlarm.name)
                     }
-                    context.startForegroundService(countdownIntent)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        context.startForegroundService(chainIntent)
+                    } else {
+                        context.startService(chainIntent)
+                    }
                     
                     // Update alarm state in repository
                     val updatedAlarms = alarms.toMutableList()
                     updatedAlarms[nextIndex] = nextAlarm.copy(
                         isActive = true,
-                        scheduledTime = System.currentTimeMillis() + delayMillis
+                        scheduledTime = endTime
                     )
                     alarmRepository.saveAlarms(updatedAlarms)
                 } else {

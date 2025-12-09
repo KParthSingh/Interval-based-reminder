@@ -11,24 +11,35 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var alarmScheduler: AlarmScheduler
@@ -45,13 +56,8 @@ class MainActivity : ComponentActivity() {
         
         alarmScheduler = AlarmScheduler(this)
         
-        // Create notification channel
         NotificationHelper.createNotificationChannel(this)
-        
-        // Check and request notification permission (Android 13+)
         checkNotificationPermission()
-        
-        // Check exact alarm permission
         checkExactAlarmPermission()
 
         setContent {
@@ -61,8 +67,8 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     MainScreen(
-                        onScheduleAlarm = { delayMillis, requestCode ->
-                            scheduleAlarm(delayMillis, requestCode)
+                        onScheduleAlarm = { delayMillis, requestCode, name, current, total ->
+                            scheduleAlarm(delayMillis, requestCode, name, current, total)
                         }
                     )
                 }
@@ -87,7 +93,6 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
             if (!alarmManager.canScheduleExactAlarms()) {
-                // Guide user to settings
                 val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
                     data = Uri.parse("package:$packageName")
                 }
@@ -96,649 +101,484 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun scheduleAlarm(delayMillis: Long, requestCode: Int) {
+    private fun scheduleAlarm(delayMillis: Long, requestCode: Int, name: String, currentIndex: Int, totalAlarms: Int) {
         alarmScheduler.scheduleAlarm(delayMillis, requestCode)
         
-        // Start countdown notification service
-        val countdownIntent = Intent(this, CountdownService::class.java).apply {
-            action = CountdownService.ACTION_START_COUNTDOWN
-            putExtra(CountdownService.EXTRA_END_TIME, System.currentTimeMillis() + delayMillis)
+        val chainIntent = Intent(this, ChainService::class.java).apply {
+            action = ChainService.ACTION_START_CHAIN_ALARM
+            putExtra(ChainService.EXTRA_END_TIME, System.currentTimeMillis() + delayMillis)
+            putExtra(ChainService.EXTRA_CURRENT_INDEX, currentIndex)
+            putExtra(ChainService.EXTRA_TOTAL_ALARMS, totalAlarms)
+            putExtra(ChainService.EXTRA_ALARM_NAME, name)
         }
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(countdownIntent)
+            startForegroundService(chainIntent)
         } else {
-            startService(countdownIntent)
+            startService(chainIntent)
         }
     }
 }
 
+// --- THEME ---
 @Composable
 fun MedicineReminderTheme(content: @Composable () -> Unit) {
+    val primaryColor = Color(0xFF6750A4) // Deep Purple
+    val secondaryColor = Color(0xFF625B71)
+    val tertiaryColor = Color(0xFF7D5260) // Pinkish
+    val background = Color(0xFFFDF8FD)
+
+    val colorScheme = lightColorScheme(
+        primary = primaryColor,
+        onPrimary = Color.White,
+        primaryContainer = Color(0xFFEADDFF),
+        onPrimaryContainer = Color(0xFF21005D),
+        secondary = secondaryColor,
+        onSecondary = Color.White,
+        secondaryContainer = Color(0xFFE8DEF8),
+        onSecondaryContainer = Color(0xFF1D192B),
+        tertiary = tertiaryColor,
+        onTertiary = Color.White,
+        background = background,
+        surface = Color(0xFFFFFBFE),
+        surfaceVariant = Color(0xFFE7E0EC),
+        onSurface = Color(0xFF1C1B1F)
+    )
+
     MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = Color(0xFF6200EE),
-            secondary = Color(0xFF03DAC6),
-            background = Color(0xFFF5F5F5)
-        ),
+        colorScheme = colorScheme,
+        typography = Typography(), // Default Material 3 typography
         content = content
     )
 }
 
+// --- MAIN SCREEN ---
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
+fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
     val context = LocalContext.current
     val repository = remember { AlarmRepository(context) }
     var alarms by remember { mutableStateOf(repository.loadAlarms()) }
     
-    // Save alarms whenever they change
     LaunchedEffect(alarms) {
         repository.saveAlarms(alarms)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // App title and add button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Medicine Reminder",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF6200EE)
-            )
-            
-            Button(
-                onClick = {
-                    alarms = alarms + Alarm()
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF6200EE)
-                )
-            ) {
-                Text("+ New Alarm")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Chain progress indicator
-        val chainManager = remember { ChainManager(context) }
-        if (chainManager.isChainActive()) {
-            val currentIndex = chainManager.getCurrentIndex()
-            if (currentIndex < alarms.size) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF03DAC5)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "🔗 Chain Active",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "Alarm ${currentIndex + 1} of ${alarms.size}",
-                                    fontSize = 12.sp,
-                                    color = Color.White.copy(alpha = 0.9f)
-                                )
-                            }
-                            
-                            val currentAlarm = alarms.getOrNull(currentIndex)
-                            if (currentAlarm != null) {
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = if (currentAlarm.name.isNotBlank()) currentAlarm.name else "Alarm ${currentIndex + 1}",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = currentAlarm.getFormattedTime(),
-                                        fontSize = 12.sp,
-                                        color = Color.White.copy(alpha = 0.9f)
-                                    )
-                                }
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        // Progress bar
-                        val progress = (currentIndex + 1).toFloat() / alarms.size.toFloat()
-                        LinearProgressIndicator(
-                            progress = progress,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp),
-                            color = Color.White,
-                            trackColor = Color.White.copy(alpha = 0.3f)
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Text(
-                            text = "${alarms.size - currentIndex - 1} alarm(s) remaining",
-                            fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-        }
-
-        // Alarm list
-        if (alarms.isEmpty()) {
-            // Empty state
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF5F5F5)
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { 
                     Text(
-                        text = "⏰",
-                        fontSize = 48.sp
+                        stringResource(R.string.title_main),
+                        fontWeight = FontWeight.Bold 
+                    ) 
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { alarms = alarms + Alarm() },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                icon = { Icon(Icons.Default.Add, "Add Alarm") },
+                text = { Text(stringResource(R.string.btn_new_alarm)) }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
+        ) {
+            val chainManager = remember { ChainManager(context) }
+            val isChainActive = chainManager.isChainActive()
+            
+            // CHAIN STATUS CARD
+            if (isChainActive) {
+                val currentIndex = chainManager.getCurrentIndex()
+                if (currentIndex < alarms.size) {
+                    ChainStatusCard(
+                        currentIndex = currentIndex,
+                        totalAlarms = alarms.size,
+                        currentAlarm = alarms[currentIndex]
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No alarms yet",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Tap '+ New Alarm' to create your first alarm",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
-        } else {
-            // Scrollable alarm list
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                alarms.forEachIndexed { index, alarm ->
-                    Column {
-                        AlarmCard(
+
+            // ALARMS LIST
+            if (alarms.isEmpty()) {
+                EmptyState()
+            } else {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    alarms.forEachIndexed { index, alarm ->
+                        AlarmItem(
                             alarm = alarm,
                             index = index,
-                            onUpdate = { updatedAlarm ->
-                                alarms = alarms.toMutableList().apply {
-                                    set(index, updatedAlarm)
-                                }
+                            totalAlarms = alarms.size,
+                            onUpdate = { updated ->
+                                alarms = alarms.toMutableList().apply { set(index, updated) }
                             },
-                            onSchedule = { delayMillis ->
-                                onScheduleAlarm(delayMillis, index + 1)
+                            onSchedule = { delay ->
+                                onScheduleAlarm(delay, index + 1, alarm.name, index, 1) // optimized for single alarm: treat as 1 of 1
                                 alarms = alarms.toMutableList().apply {
                                     set(index, alarm.copy(
                                         isActive = true,
-                                        scheduledTime = System.currentTimeMillis() + delayMillis
+                                        scheduledTime = System.currentTimeMillis() + delay
                                     ))
                                 }
+                            },
+                            onDelete = {
+                                alarms = alarms.toMutableList().apply { removeAt(index) }
+                            },
+                            onMoveUp = {
+                                if (index > 0) {
+                                    alarms = alarms.toMutableList().apply {
+                                        val temp = this[index]; this[index] = this[index - 1]; this[index - 1] = temp
+                                    }
+                                }
+                            },
+                            onMoveDown = {
+                                if (index < alarms.size - 1) {
+                                    alarms = alarms.toMutableList().apply {
+                                        val temp = this[index]; this[index] = this[index + 1]; this[index + 1] = temp
+                                    }
+                                }
+                            },
+                            onClone = {
+                                alarms = alarms.toMutableList().apply { add(index + 1, alarm.clone()) }
                             }
                         )
-                        
-                        // Action buttons row (outside card)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 6.dp)
-                        ) {
-                            // Clone button
-                            OutlinedButton(
-                                onClick = {
-                                    alarms = alarms.toMutableList().apply {
-                                        add(index + 1, alarm.clone())
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(8.dp)
-                            ) {
-                                Text("Clone", fontSize = 12.sp)
-                            }
+                    }
+                    Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
+                }
+            }
 
-                            // Move up
-                            OutlinedButton(
-                                onClick = {
-                                    if (index > 0) {
-                                        alarms = alarms.toMutableList().apply {
-                                            val temp = this[index]
-                                            this[index] = this[index - 1]
-                                            this[index - 1] = temp
-                                        }
-                                    }
-                                },
-                                enabled = index > 0,
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(8.dp)
-                            ) {
-                                Text("↑ Up", fontSize = 12.sp)
-                            }
-
-                            // Move down
-                            OutlinedButton(
-                                onClick = {
-                                    if (index < alarms.size - 1) {
-                                        alarms = alarms.toMutableList().apply {
-                                            val temp = this[index]
-                                            this[index] = this[index + 1]
-                                            this[index + 1] = temp
-                                        }
-                                    }
-                                },
-                                enabled = index < alarms.size - 1,
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(8.dp)
-                            ) {
-                                Text("↓ Down", fontSize = 12.sp)
-                            }
-
-                            // Remove
-                            OutlinedButton(
-                                onClick = {
-                                    alarms = alarms.toMutableList().apply {
-                                        removeAt(index)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = Color.Red
-                                ),
-                                contentPadding = PaddingValues(8.dp)
-                            ) {
-                                Text("Remove", fontSize = 12.sp)
-                            }
+            // START CHAIN BUTTON (Sticky bottom if not empty)
+            if (alarms.isNotEmpty() && !isChainActive) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val anyActive = alarms.any { it.isActive }
+                Button(
+                    onClick = {
+                        chainManager.startChain()
+                        val firstAlarm = alarms[0]
+                        val delay = firstAlarm.getTotalSeconds() * 1000L
+                        onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size)
+                        alarms = alarms.toMutableList().apply {
+                            set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
                         }
+                    },
+                    enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.start_chain_btn), fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(R.string.start_chain_subtitle, alarms.size),
+                            style = MaterialTheme.typography.labelSmall
+                        )
                     }
                 }
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(8.dp))
+// --- COMPONENTS ---
 
-        // Info text
-        Text(
-            text = "💡 Alarms work in background, silent mode, and when screen is off",
-            fontSize = 11.sp,
-            color = Color.Gray,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        // Start All Chain button
-        if (alarms.isNotEmpty()) {
-            val anyActive = alarms.any { it.isActive }
-            val chainManager = remember { ChainManager(context) }
-            
-            Button(
-                onClick = {
-                    // Start chain mode - only schedule the FIRST alarm
-                    // Rest will be triggered when each one is dismissed
-                    chainManager.startChain()
-                    
-                    val firstAlarm = alarms[0]
-                    val delayMillis = firstAlarm.getTotalSeconds() * 1000L
-                    
-                    // Schedule only the first alarm
-                    onScheduleAlarm(delayMillis, 1)
-                    
-                    // Update only first alarm state, mark rest as pending
-                    alarms = alarms.toMutableList().apply {
-                        set(0, firstAlarm.copy(
-                            isActive = true,
-                            scheduledTime = System.currentTimeMillis() + delayMillis
-                        ))
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF03DAC5)
-                )
+@Composable
+fun EmptyState() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("😴", fontSize = 64.sp)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                stringResource(R.string.empty_state_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                stringResource(R.string.empty_state_subtitle),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun ChainStatusCard(currentIndex: Int, totalAlarms: Int, currentAlarm: Alarm) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+        ),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                Column {
                     Text(
-                        text = "Start Chain (Sequential)",
-                        fontSize = 16.sp,
+                        stringResource(R.string.chain_active_title),
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${alarms.size} alarms • Each starts after previous",
-                        fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.9f)
+                        stringResource(R.string.chain_info_format, currentIndex + 1, totalAlarms),
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
+                if (currentAlarm.name.isNotBlank()) {
+                    Surface(
+                         color = MaterialTheme.colorScheme.tertiary,
+                         shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text(
+                            text = currentAlarm.name,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onTertiary
+                        )
+                    }
+                }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            val progress = (currentIndex + 1).toFloat() / totalAlarms.toFloat()
+            LinearProgressIndicator(
+                progress = progress,
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                color = MaterialTheme.colorScheme.tertiary,
+                trackColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.2f)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.chain_remaining_format, totalAlarms - currentIndex - 1),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.align(Alignment.End)
+            )
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlarmCard(
+fun AlarmItem(
     alarm: Alarm,
     index: Int,
+    totalAlarms: Int,
     onUpdate: (Alarm) -> Unit,
-    onSchedule: (Long) -> Unit
+    onSchedule: (Long) -> Unit,
+    onDelete: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onClone: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf(alarm.name) }
-    var hours by remember { mutableStateOf(alarm.hours) }
-    var minutes by remember { mutableStateOf(alarm.minutes) }
-    var seconds by remember { mutableStateOf(alarm.seconds) }
     
-    // Auto-reset alarm when time has passed
+    // Auto-reset
     LaunchedEffect(alarm.isActive, alarm.scheduledTime) {
         if (alarm.isActive && alarm.scheduledTime > 0) {
             val remaining = alarm.scheduledTime - System.currentTimeMillis()
-            if (remaining > 0) {
-                delay(remaining)
-            }
-            // Reset alarm after it triggers
+            if (remaining > 0) delay(remaining)
             onUpdate(alarm.copy(isActive = false, scheduledTime = 0L))
         }
     }
-    
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = if (alarm.isActive) Color(0xFFFFF3E0) else Color.White
+            containerColor = if (alarm.isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+            contentColor = if (alarm.isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(if (expanded) 6.dp else 2.dp),
         onClick = { expanded = !expanded }
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp)
-        ) {
-            // Header (always visible)
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Text(
+                    "#${index + 1}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "#${index + 1}",
-                            fontSize = 12.sp,
-                            color = Color.Gray,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text(
-                            text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (alarm.isActive) Color(0xFFE65100) else Color.Black
-                        )
-                    }
+                    Text(
+                        text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                     Text(
                         text = alarm.getFormattedTime(),
-                        fontSize = 14.sp,
-                        color = Color.Gray
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline
                     )
-                    if (alarm.isActive) {
-                        val remaining = ((alarm.scheduledTime - System.currentTimeMillis()) / 1000).toInt()
-                        if (remaining > 0) {
-                            val h = remaining / 3600
-                            val m = (remaining % 3600) / 60
-                            val s = remaining % 60
-                            Text(
-                                text = "⏱️ ${String.format("%02d:%02d:%02d", h, m, s)} remaining",
-                                fontSize = 12.sp,
-                                color = Color(0xFFE65100)
-                            )
-                        }
+                }
+                
+                if (alarm.isActive) {
+                    val remaining = ((alarm.scheduledTime - System.currentTimeMillis()) / 1000).toInt()
+                    if (remaining > 0) {
+                        Text(
+                            "⏱️ ${formatTime(remaining)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
                 
-                Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // Expanded content
-            if (expanded) {
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Divider()
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                // Name field
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { 
-                        name = it
-                        onUpdate(alarm.copy(name = it))
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Name (optional)", fontSize = 12.sp) },
-                    placeholder = { Text("e.g., First Medicine", fontSize = 14.sp) },
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Time picker
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    CompactTimePickerColumn(
-                        value = hours,
-                        range = 0..23,
-                        label = "Hours",
-                        onValueChange = { 
-                            hours = it
-                            onUpdate(alarm.copy(hours = it, isActive = false, scheduledTime = 0L))
-                        }
-                    )
-                    Text(":", fontSize = 24.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 4.dp))
-                    CompactTimePickerColumn(
-                        value = minutes,
-                        range = 0..59,
-                        label = "Min",
-                        onValueChange = { 
-                            minutes = it
-                            onUpdate(alarm.copy(minutes = it, isActive = false, scheduledTime = 0L))
-                        }
-                    )
-                    Text(":", fontSize = 24.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 4.dp))
-                    CompactTimePickerColumn(
-                        value = seconds,
-                        range = 0..59,
-                        label = "Sec",
-                        onValueChange = { 
-                            seconds = it
-                            onUpdate(alarm.copy(seconds = it, isActive = false, scheduledTime = 0L))
-                        }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Expand"
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Quick presets
+            if (expanded) {
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                
+                // Content
+                EditAlarmContent(
+                    alarm = alarm,
+                    onUpdate = onUpdate,
+                    onSchedule = onSchedule
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Actions
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    listOf(
-                        Triple(0, 0, 5) to "5s",
-                        Triple(0, 0, 30) to "30s",
-                        Triple(0, 1, 0) to "1m",
-                        Triple(0, 5, 0) to "5m"
-                    ).forEach { (time, label) ->
-                        OutlinedButton(
-                            onClick = {
-                                hours = time.first
-                                minutes = time.second
-                                seconds = time.third
-                                onUpdate(alarm.copy(hours = time.first, minutes = time.second, seconds = time.third, isActive = false, scheduledTime = 0L))
-                            },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(8.dp)
-                        ) {
-                            Text(label, fontSize = 12.sp)
-                        }
+                    IconButton(onClick = onMoveUp, enabled = index > 0) {
+                        Text("↑")
                     }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Start button
-                Button(
-                    onClick = {
-                        val delayMillis = alarm.getTotalSeconds() * 1000L
-                        onSchedule(delayMillis)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !alarm.isActive && alarm.getTotalSeconds() > 0,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6200EE)
-                    ),
-                    contentPadding = PaddingValues(12.dp)
-                ) {
-                    Text("Start Alarm", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = onMoveDown, enabled = index < totalAlarms - 1) {
+                        Text("↓")
+                    }
+                    TextButton(onClick = onClone) {
+                        Text(stringResource(R.string.clone))
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, stringResource(R.string.remove), tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }
     }
 }
 
-// Compact time picker column (made slightly larger for readability)
 @Composable
-fun CompactTimePickerColumn(
-    value: Int,
-    range: IntRange,
-    label: String,
-    onValueChange: (Int) -> Unit
+fun EditAlarmContent(
+    alarm: Alarm,
+    onUpdate: (Alarm) -> Unit,
+    onSchedule: (Long) -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(60.dp)
-    ) {
-        IconButton(
-            onClick = { 
-                val newValue = if (value < range.last) value + 1 else range.first
-                onValueChange(newValue)
-            },
-            modifier = Modifier.size(34.dp)
-        ) {
-            Text("▲", fontSize = 13.sp, color = Color(0xFF6200EE))
-        }
-
-        Text(
-            text = String.format("%02d", value),
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF6200EE)
+    Column {
+        OutlinedTextField(
+            value = alarm.name,
+            onValueChange = { onUpdate(alarm.copy(name = it)) },
+            label = { Text("Alarm Name") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
         )
-
-        IconButton(
-            onClick = { 
-                val newValue = if (value > range.first) value - 1 else range.last
-                onValueChange(newValue)
-            },
-            modifier = Modifier.size(34.dp)
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("▼", fontSize = 13.sp, color = Color(0xFF6200EE))
+            TimeInput(alarm.hours, 23, "Hr") { onUpdate(alarm.copy(hours = it, isActive = false)) }
+            Text(":", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
+            TimeInput(alarm.minutes, 59, "Min") { onUpdate(alarm.copy(minutes = it, isActive = false)) }
+            Text(":", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
+            TimeInput(alarm.seconds, 59, "Sec") { onUpdate(alarm.copy(seconds = it, isActive = false)) }
         }
-
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = Color.Gray
-        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Presets
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            listOf(5, 30, 60, 300).forEach { sec ->
+                OutlinedButton(
+                    onClick = {
+                        val h = sec / 3600; val m = (sec % 3600) / 60; val s = sec % 60
+                        onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
+                    },
+                    contentPadding = PaddingValues(horizontal = 12.dp)
+                ) {
+                    Text(if (sec < 60) "${sec}s" else "${sec/60}m")
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Button(
+            onClick = { onSchedule(alarm.getTotalSeconds() * 1000L) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !alarm.isActive && alarm.getTotalSeconds() > 0
+        ) {
+            Icon(Icons.Default.PlayArrow, null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.start_alarm_now))
+        }
     }
 }
 
 @Composable
-fun TimePickerColumn(
+fun TimeInput(
     value: Int,
-    range: IntRange,
+    max: Int,
     label: String,
     onValueChange: (Int) -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(60.dp)
-    ) {
-        IconButton(
-            onClick = { 
-                val newValue = if (value < range.last) value + 1 else range.first
-                onValueChange(newValue)
-            },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Text("▲", fontSize = 12.sp, color = Color(0xFF6200EE))
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(onClick = { onValueChange(if (value < max) value + 1 else 0) }) {
+            Text("▲")
         }
-
         Text(
-            text = String.format("%02d", value),
-            fontSize = 24.sp,
+            String.format("%02d", value),
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF6200EE)
+            color = MaterialTheme.colorScheme.primary
         )
-
-        IconButton(
-            onClick = { 
-                val newValue = if (value > range.first) value - 1 else range.last
-                onValueChange(newValue)
-            },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Text("▼", fontSize = 12.sp, color = Color(0xFF6200EE))
+        IconButton(onClick = { onValueChange(if (value > 0) value - 1 else max) }) {
+            Text("▼")
         }
-
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            color = Color.Gray
-        )
+        Text(label, style = MaterialTheme.typography.labelSmall)
     }
+}
+
+fun formatTime(seconds: Int): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
 }

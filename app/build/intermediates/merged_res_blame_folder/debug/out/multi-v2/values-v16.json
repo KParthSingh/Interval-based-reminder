@@ -4,7 +4,7 @@
             "outputFile": "com.medicinereminder.app-mergeDebugResources-2:/values-v16/values-v16.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Om Singh\\.gradle\\caches\\transforms-3\\2ccd268e0ca2e1cd10ec650ac8067a3e\\transformed\\core-1.12.0\\res\\values-v16\\values-v16.xml",
+                    "source": "C:\\Users\\Om Singh\\.gradle\\caches\\9.0-milestone-1\\transforms\\102bb4ca6e8b3e009636483291d8df3f\\transformed\\core-1.12.0\\res\\values-v16\\values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
