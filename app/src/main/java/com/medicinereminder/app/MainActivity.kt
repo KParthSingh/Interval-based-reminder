@@ -12,11 +12,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -121,85 +127,271 @@ fun MedicineReminderTheme(content: @Composable () -> Unit) {
 
 @Composable
 fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
-    var alarmName by remember { mutableStateOf("") }
-    var hours by remember { mutableStateOf(0) }
-    var minutes by remember { mutableStateOf(0) }
-    var seconds by remember { mutableStateOf(5) } // Default 5 seconds
-    var countdown by remember { mutableStateOf(0L) }
-    var alarmScheduledTime by remember { mutableStateOf<Long?>(null) }
-
-    // Countdown timer
-    LaunchedEffect(countdown) {
-        if (countdown > 0) {
-            delay(1000)
-            countdown -= 1000
-        } else {
-            alarmScheduledTime = null
-        }
+    val context = LocalContext.current
+    val repository = remember { AlarmRepository(context) }
+    var alarms by remember { mutableStateOf(repository.loadAlarms()) }
+    
+    // Save alarms whenever they change
+    LaunchedEffect(alarms) {
+        repository.saveAlarms(alarms)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(16.dp)
     ) {
-        // App title
-        Text(
-            text = "Medicine Reminder",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF6200EE),
-            modifier = Modifier.padding(vertical = 16.dp)
-        )
-
-        // Main alarm card
-        Card(
+        // App title and add button
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = Color.White
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Text(
+                text = "Medicine Reminder",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF6200EE)
+            )
+            
+            Button(
+                onClick = {
+                    alarms = alarms + Alarm()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF6200EE)
+                )
             ) {
-                // Alarm name section
+                Text("+ New Alarm")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Alarm list
+        if (alarms.isEmpty()) {
+            // Empty state
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF5F5F5)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "⏰",
+                        fontSize = 48.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No alarms yet",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Tap '+ New Alarm' to create your first alarm",
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            // Scrollable alarm list
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                alarms.forEachIndexed { index, alarm ->
+                    AlarmCard(
+                        alarm = alarm,
+                        index = index,
+                        totalCount = alarms.size,
+                        onUpdate = { updatedAlarm ->
+                            alarms = alarms.toMutableList().apply {
+                                set(index, updatedAlarm)
+                            }
+                        },
+                        onClone = {
+                            alarms = alarms.toMutableList().apply {
+                                add(index + 1, alarm.clone())
+                            }
+                        },
+                        onRemove = {
+                            alarms = alarms.toMutableList().apply {
+                                removeAt(index)
+                            }
+                        },
+                        onMoveUp = {
+                            if (index > 0) {
+                                alarms = alarms.toMutableList().apply {
+                                    val temp = this[index]
+                                    this[index] = this[index - 1]
+                                    this[index - 1] = temp
+                                }
+                            }
+                        },
+                        onMoveDown = {
+                            if (index < alarms.size - 1) {
+                                alarms = alarms.toMutableList().apply {
+                                    val temp = this[index]
+                                    this[index] = this[index + 1]
+                                    this[index + 1] = temp
+                                }
+                            }
+                        },
+                        onSchedule = { delayMillis ->
+                            onScheduleAlarm(delayMillis, index + 1)
+                            alarms = alarms.toMutableList().apply {
+                                set(index, alarm.copy(
+                                    isActive = true,
+                                    scheduledTime = System.currentTimeMillis() + delayMillis
+                                ))
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Info text
+        Text(
+            text = "💡 Alarms work in background, silent mode, and when screen is off",
+            fontSize = 11.sp,
+            color = Color.Gray,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AlarmCard(
+    alarm: Alarm,
+    index: Int,
+    totalCount: Int,
+    onUpdate: (Alarm) -> Unit,
+    onClone: () -> Unit,
+    onRemove: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onSchedule: (Long) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf(alarm.name) }
+    var hours by remember { mutableStateOf(alarm.hours) }
+    var minutes by remember { mutableStateOf(alarm.minutes) }
+    var seconds by remember { mutableStateOf(alarm.seconds) }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (alarm.isActive) Color(0xFFFFF3E0) else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        onClick = { expanded = !expanded }
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            // Header (always visible)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "#${index + 1}",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                        Text(
+                            text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (alarm.isActive) Color(0xFFE65100) else Color.Black
+                        )
+                    }
+                    Text(
+                        text = alarm.getFormattedTime(),
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                    if (alarm.isActive) {
+                        val remaining = ((alarm.scheduledTime - System.currentTimeMillis()) / 1000).toInt()
+                        if (remaining > 0) {
+                            val h = remaining / 3600
+                            val m = (remaining % 3600) / 60
+                            val s = remaining % 60
+                            Text(
+                                text = "⏱️ ${String.format("%02d:%02d:%02d", h, m, s)} remaining",
+                                fontSize = 11.sp,
+                                color = Color(0xFFE65100)
+                            )
+                        }
+                    }
+                }
+                
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Expanded content
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Divider()
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Name field
                 Text(
                     text = "Alarm Name (Optional)",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.align(Alignment.Start)
+                    fontSize = 11.sp,
+                    color = Color.Gray
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
-                    value = alarmName,
-                    onValueChange = { alarmName = it },
+                    value = name,
+                    onValueChange = { 
+                        name = it
+                        onUpdate(alarm.copy(name = it))
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("e.g., First Medicine") },
+                    placeholder = { Text("e.g., First Medicine", fontSize = 13.sp) },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF6200EE),
-                        unfocusedBorderColor = Color.LightGray
-                    )
+                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Time picker section
+                // Time picker
                 Text(
                     text = "Set Time",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.align(Alignment.Start)
+                    fontSize = 11.sp,
+                    color = Color.Gray
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Clock-style time picker
+                Spacer(modifier = Modifier.height(8.dp))
+                
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
@@ -208,160 +400,139 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
                     TimePickerColumn(
                         value = hours,
                         range = 0..23,
-                        label = "Hours",
-                        onValueChange = { hours = it }
+                        label = "H",
+                        onValueChange = { 
+                            hours = it
+                            // Reset active state when time is changed
+                            onUpdate(alarm.copy(hours = it, isActive = false, scheduledTime = 0L))
+                        }
                     )
-
-                    Text(
-                        text = ":",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6200EE),
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-
+                    Text(":", fontSize = 20.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 3.dp))
                     TimePickerColumn(
                         value = minutes,
                         range = 0..59,
-                        label = "Min",
-                        onValueChange = { minutes = it }
+                        label = "M",
+                        onValueChange = { 
+                            minutes = it
+                            // Reset active state when time is changed
+                            onUpdate(alarm.copy(minutes = it, isActive = false, scheduledTime = 0L))
+                        }
                     )
-
-                    Text(
-                        text = ":",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6200EE),
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-
+                    Text(":", fontSize = 20.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 3.dp))
                     TimePickerColumn(
                         value = seconds,
                         range = 0..59,
-                        label = "Sec",
-                        onValueChange = { seconds = it }
+                        label = "S",
+                        onValueChange = { 
+                            seconds = it
+                            // Reset active state when time is changed
+                            onUpdate(alarm.copy(seconds = it, isActive = false, scheduledTime = 0L))
+                        }
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Quick presets
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedButton(
-                        onClick = { hours = 0; minutes = 0; seconds = 5 },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("5s", fontSize = 12.sp)
-                    }
-
-                    OutlinedButton(
-                        onClick = { hours = 0; minutes = 0; seconds = 30 },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("30s", fontSize = 12.sp)
-                    }
-
-                    OutlinedButton(
-                        onClick = { hours = 0; minutes = 1; seconds = 0 },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("1m", fontSize = 12.sp)
-                    }
-
-                    OutlinedButton(
-                        onClick = { hours = 0; minutes = 5; seconds = 0 },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("5m", fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Status card (when alarm is scheduled)
-        if (countdown > 0) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFFFF3E0)
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "⏱️",
-                            fontSize = 24.sp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            if (alarmName.isNotBlank()) {
-                                Text(
-                                    text = alarmName,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFE65100)
-                                )
-                            }
-                            val remainingSeconds = (countdown / 1000).toInt()
-                            val h = remainingSeconds / 3600
-                            val m = (remainingSeconds % 3600) / 60
-                            val s = remainingSeconds % 60
-                            Text(
-                                text = "Alarm in ${String.format("%02d:%02d:%02d", h, m, s)}",
-                                fontSize = 14.sp,
-                                color = Color(0xFFE65100)
-                            )
+                    listOf(
+                        Triple(0, 0, 5) to "5s",
+                        Triple(0, 0, 30) to "30s",
+                        Triple(0, 1, 0) to "1m",
+                        Triple(0, 5, 0) to "5m"
+                    ).forEach { (time, label) ->
+                        OutlinedButton(
+                            onClick = {
+                                hours = time.first
+                                minutes = time.second
+                                seconds = time.third
+                                // Reset active state when preset is used
+                                onUpdate(alarm.copy(hours = time.first, minutes = time.second, seconds = time.third, isActive = false, scheduledTime = 0L))
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(2.dp)
+                        ) {
+                            Text(label, fontSize = 10.sp)
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Action buttons
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Start button
+                    Button(
+                        onClick = {
+                            val delayMillis = alarm.getTotalSeconds() * 1000L
+                            onSchedule(delayMillis)
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = !alarm.isActive && alarm.getTotalSeconds() > 0,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6200EE)
+                        ),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        Text("Start", fontSize = 12.sp)
+                    }
+
+                    // Clone button
+                    OutlinedButton(
+                        onClick = onClone,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        Text("Clone", fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Move up
+                    OutlinedButton(
+                        onClick = onMoveUp,
+                        enabled = index > 0,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        Text("↑ Up", fontSize = 12.sp)
+                    }
+
+                    // Move down
+                    OutlinedButton(
+                        onClick = onMoveDown,
+                        enabled = index < totalCount - 1,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        Text("↓ Down", fontSize = 12.sp)
+                    }
+
+                    // Remove
+                    OutlinedButton(
+                        onClick = onRemove,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color.Red
+                        ),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        Text("Remove", fontSize = 12.sp)
+                    }
+                }
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
-
-        // Start button
-        val totalSeconds = hours * 3600 + minutes * 60 + seconds
-        Button(
-            onClick = {
-                val delayMillis = totalSeconds * 1000L
-                countdown = delayMillis
-                alarmScheduledTime = System.currentTimeMillis() + delayMillis
-                onScheduleAlarm(delayMillis, 1)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF6200EE)
-            ),
-            enabled = countdown == 0L && totalSeconds > 0
-        ) {
-            Text(
-                text = "Start Alarm",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Info text
-        Text(
-            text = "💡 Alarms work in background, silent mode, and when screen is off",
-            fontSize = 12.sp,
-            color = Color.Gray,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
     }
 }
 
@@ -374,43 +545,38 @@ fun TimePickerColumn(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(70.dp)
+        modifier = Modifier.width(60.dp)
     ) {
-        // Up button
         IconButton(
             onClick = { 
                 val newValue = if (value < range.last) value + 1 else range.first
                 onValueChange(newValue)
             },
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(32.dp)
         ) {
-            Text("▲", fontSize = 14.sp, color = Color(0xFF6200EE))
+            Text("▲", fontSize = 12.sp, color = Color(0xFF6200EE))
         }
 
-        // Value display
         Text(
             text = String.format("%02d", value),
-            fontSize = 32.sp,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF6200EE),
-            textAlign = TextAlign.Center
+            color = Color(0xFF6200EE)
         )
 
-        // Down button
         IconButton(
             onClick = { 
                 val newValue = if (value > range.first) value - 1 else range.last
                 onValueChange(newValue)
             },
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(32.dp)
         ) {
-            Text("▼", fontSize = 14.sp, color = Color(0xFF6200EE))
+            Text("▼", fontSize = 12.sp, color = Color(0xFF6200EE))
         }
 
-        // Label
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             color = Color.Gray
         )
     }
