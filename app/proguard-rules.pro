@@ -1,0 +1,11 @@
+# Add project specific ProGuard rules here.
+# You can control the set of applied configuration files using the
+# proguardFiles setting in build.gradle.kts.
+#
+# For more details, see
+#   http://developer.android.com/guide/developing/tools/proguard.html
+
+# Keep alarm-related classes
+-keep class com.medicinereminder.app.AlarmReceiver { *; }
+-keep class com.medicinereminder.app.BootReceiver { *; }
+-keep class com.medicinereminder.app.AlarmService { *; }

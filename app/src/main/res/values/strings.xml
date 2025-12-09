@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Medicine Reminder</string>
+    <string name="start_alarm_now">Start Alarm Now</string>
+    <string name="alarm_in_10_seconds">Alarm in 10 Seconds</string>
+    <string name="alarm_in_20_seconds">Alarm in 20 Seconds</string>
+    <string name="dismiss_alarm">Dismiss Alarm</string>
+    <string name="alarm_ringing">Alarm is Ringing!</string>
+    <string name="time_to_take_medicine">Time to take your medicine</string>
+    <string name="notification_channel_name">Alarm Notifications</string>
+    <string name="notification_channel_description">Notifications for medicine reminder alarms</string>
+    <string name="alarm_service_notification">Alarm is active</string>
+</resources>
