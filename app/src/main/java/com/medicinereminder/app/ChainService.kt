@@ -32,10 +32,11 @@ class ChainService : Service() {
         countdownJob?.cancel()
         countdownJob = serviceScope.launch {
             while (isActive && System.currentTimeMillis() < endTime) {
-                delay(1000) // Keep the loop to trigger alarm, but don't spam notifications
+                delay(1000)
                 if (!isActive) break
                 
-                // updateNotification() - Removed as per user request to simplify/forget notification
+                // Update notification every second so timer shows live countdown
+                updateNotification()
             }
             
             if (isActive) {

@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Medicine Reminder</string>
     <string name="title_main">Medicine Reminder</string>
-    <string name="btn_new_alarm">+ New Alarm</string>
+    <string name="btn_new_alarm">Add Alarm</string>
     <string name="start_alarm_now">Start Alarm Now</string>
     <string name="alarm_in_10_seconds">Alarm in 10 Seconds</string>
     <string name="alarm_in_20_seconds">Alarm in 20 Seconds</string>
@@ -28,7 +28,7 @@
     <string name="move_down">↓ Down</string>
     <string name="remove">Remove</string>
     
-    <string name="chain_active_title">⛓️ Chain Active</string>
+    <string name="chain_active_title">Sequence Running</string>
     <string name="chain_info_format">Alarm %1$d of %2$d</string>
     <string name="chain_remaining_format">%1$d alarm(s) remaining in sequence</string>
     <string name="start_chain_btn">Start Chain Sequence</string>

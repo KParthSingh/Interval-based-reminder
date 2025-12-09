@@ -385,11 +385,9 @@ fun StickyChainBar(
     var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(isPaused) {
-        if (!isPaused) {
-            while (true) {
-                currentTime = System.currentTimeMillis()
-                delay(1000)
-            }
+        while (!isPaused) {
+            currentTime = System.currentTimeMillis()
+            delay(1000)
         }
     }
 
@@ -496,7 +494,7 @@ fun AlarmItem(
     onMoveDown: () -> Unit,
     onClone: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
+
     
     // Auto-reset
     LaunchedEffect(alarm.isActive, alarm.scheduledTime) {
@@ -508,102 +506,71 @@ fun AlarmItem(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (alarm.isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
             contentColor = if (alarm.isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
         ),
-        elevation = CardDefaults.cardElevation(if (expanded) 6.dp else 2.dp),
-        onClick = { expanded = !expanded }
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Header with actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    "#${index + 1}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(end = 12.dp)
+                    text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = alarm.getFormattedTime(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
                 
-                
-                if (alarm.isActive) {
-                    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
-                    
-                    LaunchedEffect(alarm.isActive) {
-                        while (alarm.isActive) {
-                            currentTime = System.currentTimeMillis()
-                            delay(1000)
-                        }
+                // Action icons
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onMoveUp,
+                        enabled = index > 0
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Move Up",
+                            tint = if (index > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        )
                     }
-                    
-                    val remaining = ((alarm.scheduledTime - currentTime) / 1000).toInt()
-                    if (remaining > 0) {
-                        Text(
-                            "⏱️ ${formatTime(remaining)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
+                    IconButton(
+                        onClick = onMoveDown,
+                        enabled = index < totalAlarms - 1
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Move Down",
+                            tint = if (index < totalAlarms - 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        )
+                    }
+                    IconButton(onClick = onClone) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Clone"
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
-
-                
-                IconButton(onClick = { expanded = !expanded }) {
-                    Icon(
-                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Expand"
-                    )
-                }
             }
 
-            if (expanded) {
-                Divider(modifier = Modifier.padding(vertical = 12.dp))
-                
-                // Content
-                EditAlarmContent(
+            // Content
+            EditAlarmContent(
                     alarm = alarm,
                     onUpdate = onUpdate,
                     onSchedule = onSchedule
                 )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Actions
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    IconButton(onClick = onMoveUp, enabled = index > 0) {
-                        Text("↑")
-                    }
-                    IconButton(onClick = onMoveDown, enabled = index < totalAlarms - 1) {
-                        Text("↓")
-                    }
-                    TextButton(onClick = onClone) {
-                        Text(stringResource(R.string.clone))
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, stringResource(R.string.remove), tint = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
         }
     }
 }
@@ -614,6 +581,8 @@ fun EditAlarmContent(
     onUpdate: (Alarm) -> Unit,
     onSchedule: (Long) -> Unit
 ) {
+    var showTimePicker by remember { mutableStateOf(false) }
+    
     Column {
         OutlinedTextField(
             value = alarm.name,
@@ -623,39 +592,21 @@ fun EditAlarmContent(
             singleLine = true
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+        // Time selector button
+        OutlinedButton(
+            onClick = { showTimePicker = true },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            TimeInput(alarm.hours, 23, "Hr") { onUpdate(alarm.copy(hours = it, isActive = false)) }
-            Text(":", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
-            TimeInput(alarm.minutes, 59, "Min") { onUpdate(alarm.copy(minutes = it, isActive = false)) }
-            Text(":", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
-            TimeInput(alarm.seconds, 59, "Sec") { onUpdate(alarm.copy(seconds = it, isActive = false)) }
+            Icon(Icons.Default.MoreVert, null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(alarm.getFormattedTime())
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
-        // Presets
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            listOf(5, 30, 60, 300).forEach { sec ->
-                OutlinedButton(
-                    onClick = {
-                        val h = sec / 3600; val m = (sec % 3600) / 60; val s = sec % 60
-                        onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
-                    },
-                    contentPadding = PaddingValues(horizontal = 12.dp)
-                ) {
-                    Text(if (sec < 60) "${sec}s" else "${sec/60}m")
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
+        // Start button
         Button(
             onClick = { onSchedule(alarm.getTotalSeconds() * 1000L) },
             modifier = Modifier.fillMaxWidth(),
@@ -665,6 +616,65 @@ fun EditAlarmContent(
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.start_alarm_now))
         }
+        
+        // Stop button (when active)
+        if (alarm.isActive) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onUpdate(alarm.copy(isActive = false, scheduledTime = 0L)) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(Icons.Default.Delete, null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Stop Alarm")
+            }
+        }
+    }
+    
+    // Time picker dialog
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Set Time") },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TimeInput(alarm.hours, 23, "Hr") { onUpdate(alarm.copy(hours = it, isActive = false)) }
+                        Text(":", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
+                        TimeInput(alarm.minutes, 59, "Min") { onUpdate(alarm.copy(minutes = it, isActive = false)) }
+                        Text(":", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
+                        TimeInput(alarm.seconds, 59, "Sec") { onUpdate(alarm.copy(seconds = it, isActive = false)) }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    // Quick presets
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        listOf(5, 30, 60, 300).forEach { sec ->
+                            OutlinedButton(
+                                onClick = {
+                                    val h = sec / 3600; val m = (sec % 3600) / 60; val s = sec % 60
+                                    onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Text(if (sec < 60) "${sec}s" else "${sec/60}m", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Done")
+                }
+            }
+        )
     }
 }
 
