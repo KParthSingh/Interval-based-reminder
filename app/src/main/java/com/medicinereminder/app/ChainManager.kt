@@ -11,6 +11,7 @@ class ChainManager(private val context: Context) {
         private const val KEY_IS_PAUSED = "is_paused"
         private const val KEY_REMAINING_TIME = "remaining_time"
         private const val KEY_CURRENT_REMAINING = "current_remaining_time"
+        private const val KEY_IS_ALARM_RINGING = "is_alarm_ringing"
     }
     
     fun startChain() {
@@ -78,5 +79,21 @@ class ChainManager(private val context: Context) {
 
     fun getCurrentRemainingTime(): Long {
         return prefs.getLong(KEY_CURRENT_REMAINING, 0L)
+    }
+    
+    fun setCurrentIndex(index: Int) {
+        prefs.edit()
+            .putInt(KEY_CURRENT_INDEX, index)
+            .apply()
+    }
+    
+    fun isAlarmRinging(): Boolean {
+        return prefs.getBoolean(KEY_IS_ALARM_RINGING, false)
+    }
+    
+    fun setAlarmRinging(isRinging: Boolean) {
+        prefs.edit()
+            .putBoolean(KEY_IS_ALARM_RINGING, isRinging)
+            .apply()
     }
 }

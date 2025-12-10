@@ -83,19 +83,27 @@ fun SimpleWheel(
     val itemHeight = 40.dp
     val visibleItems = 3 // Show 1 above, 1 selected, 1 below
     
-    // Notify change when scrolling stops/snaps
+    // Track if we're programmatically scrolling to prevent feedback loop
+    var isProgrammaticScroll by remember { mutableStateOf(false) }
+    
+    // Notify change when scrolling stops/snaps (only from user interaction)
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
             .collect { index ->
-                onValueChange(index)
+                if (!isProgrammaticScroll) {
+                    onValueChange(index)
+                }
             }
     }
     
     // Sync external value changes (e.g. from presets) back to list position
     LaunchedEffect(value) {
         if (listState.firstVisibleItemIndex != value) {
+            isProgrammaticScroll = true
             listState.scrollToItem(value)
+            kotlinx.coroutines.delay(50) // Small delay to ensure scroll completes
+            isProgrammaticScroll = false
         }
     }
 

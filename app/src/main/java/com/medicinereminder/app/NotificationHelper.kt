@@ -86,6 +86,26 @@ object NotificationHelper {
             resumeIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        
+        val nextIntent = Intent(context, ChainService::class.java).apply {
+            action = ChainService.ACTION_NEXT_ALARM
+        }
+        val nextPendingIntent = PendingIntent.getService(
+            context,
+            6,
+            nextIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        val prevIntent = Intent(context, ChainService::class.java).apply {
+            action = ChainService.ACTION_PREV_ALARM
+        }
+        val prevPendingIntent = PendingIntent.getService(
+            context,
+            7,
+            prevIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val hours = remainingSeconds / 3600
         val minutes = (remainingSeconds % 3600) / 60
@@ -108,6 +128,15 @@ object NotificationHelper {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setColor(Color.parseColor("#6750A4"))
+        
+        // Add navigation buttons (Previous)
+        if (currentStep > 1) {
+            builder.addAction(
+                android.R.drawable.ic_media_previous,
+                "PREV",
+                prevPendingIntent
+            )
+        }
             
         if (isPaused) {
             builder.addAction(
@@ -122,10 +151,19 @@ object NotificationHelper {
                 pausePendingIntent
             )
         }
+        
+        // Add navigation buttons (Next)
+        if (currentStep < totalSteps) {
+            builder.addAction(
+                android.R.drawable.ic_media_next,
+                "NEXT",
+                nextPendingIntent
+            )
+        }
             
         return builder.addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "STOP SEQUENCE",
+                "STOP",
                 stopPendingIntent
             )
             .build()

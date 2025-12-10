@@ -91,6 +91,9 @@ class ChainService : Service() {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
         
+        // Set alarm ringing state
+        ChainManager(this).setAlarmRinging(true)
+        
         // Start alarm sound service (no full-screen activity)
         val serviceIntent = Intent(this, AlarmService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -119,6 +122,8 @@ class ChainService : Service() {
         const val ACTION_STOP_CHAIN = "com.medicinereminder.app.STOP_CHAIN"
         const val ACTION_PAUSE_CHAIN = "com.medicinereminder.app.PAUSE_CHAIN"
         const val ACTION_RESUME_CHAIN = "com.medicinereminder.app.RESUME_CHAIN"
+        const val ACTION_NEXT_ALARM = "com.medicinereminder.app.NEXT_ALARM"
+        const val ACTION_PREV_ALARM = "com.medicinereminder.app.PREV_ALARM"
         
         const val EXTRA_END_TIME = "end_time"
         const val EXTRA_CURRENT_INDEX = "current_index"
@@ -186,6 +191,14 @@ class ChainService : Service() {
             ACTION_RESUME_CHAIN -> {
                 Log.d("ChainService", ">>> ACTION_RESUME_CHAIN received")
                 handleResume()
+            }
+            ACTION_NEXT_ALARM -> {
+                Log.d("ChainService", ">>> ACTION_NEXT_ALARM received")
+                handleNextAlarm()
+            }
+            ACTION_PREV_ALARM -> {
+                Log.d("ChainService", ">>> ACTION_PREV_ALARM received")
+                handlePrevAlarm()
             }
             else -> {
                 Log.w("ChainService", "Unknown action received: ${intent?.action}")
@@ -260,5 +273,125 @@ class ChainService : Service() {
         
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
+    }
+    
+    private fun handleNextAlarm() {
+        Log.d("ChainService", "handleNextAlarm() called")
+        
+        // Clear alarm ringing state
+        ChainManager(this).setAlarmRinging(false)
+        
+        // Stop any currently ringing alarm
+        val stopAlarmIntent = Intent(this, AlarmService::class.java)
+        stopService(stopAlarmIntent)
+        
+        // Cancel current countdown
+        countdownJob?.cancel()
+        
+        // Cancel scheduled alarm
+        val alarmScheduler = AlarmScheduler(this)
+        alarmScheduler.cancelAlarm(currentIndex + 1)
+        
+        // Get alarm repository
+        val repository = AlarmRepository(this)
+        val alarms = repository.loadAlarms()
+        
+        // Check if there's a next alarm
+        val nextIndex = currentIndex + 1
+        if (nextIndex < alarms.size) {
+            Log.d("ChainService", "Moving to next alarm: index $nextIndex")
+            
+            // Update chain manager
+            ChainManager(this).moveToNextAlarm()
+            
+            // Start the next alarm
+            val nextAlarm = alarms[nextIndex]
+            val delayMillis = nextAlarm.getTotalSeconds() * 1000L
+            val newEndTime = System.currentTimeMillis() + delayMillis
+            
+            // Schedule with AlarmManager
+            alarmScheduler.scheduleAlarm(delayMillis, nextIndex + 1)
+            
+            // Update service state
+            currentIndex = nextIndex
+            totalAlarms = alarms.size
+            currentAlarmName = nextAlarm.name
+            endTime = newEndTime
+            
+            // Update repository
+            val updatedAlarms = alarms.toMutableList()
+            updatedAlarms[nextIndex] = nextAlarm.copy(isActive = true, scheduledTime = newEndTime)
+            repository.saveAlarms(updatedAlarms)
+            
+            // Start countdown for next alarm
+            startCountdown()
+            
+            Log.d("ChainService", "Next alarm started successfully")
+        } else {
+            Log.d("ChainService", "No more alarms, stopping chain")
+            // No more alarms, stop the chain
+            val stopIntent = Intent(this, ChainService::class.java).apply {
+                action = ACTION_STOP_CHAIN
+            }
+            startService(stopIntent)
+        }
+    }
+    
+    private fun handlePrevAlarm() {
+        Log.d("ChainService", "handlePrevAlarm() called")
+        
+        // Clear alarm ringing state
+        ChainManager(this).setAlarmRinging(false)
+        
+        // Stop any currently ringing alarm
+        val stopAlarmIntent = Intent(this, AlarmService::class.java)
+        stopService(stopAlarmIntent)
+        
+        // Cancel current countdown
+        countdownJob?.cancel()
+        
+        // Cancel scheduled alarm
+        val alarmScheduler = AlarmScheduler(this)
+        alarmScheduler.cancelAlarm(currentIndex + 1)
+        
+        // Get alarm repository
+        val repository = AlarmRepository(this)
+        val alarms = repository.loadAlarms()
+        
+        // Check if there's a previous alarm
+        val prevIndex = currentIndex - 1
+        if (prevIndex >= 0) {
+            Log.d("ChainService", "Moving to previous alarm: index $prevIndex")
+            
+            // Update chain manager to previous index
+            val chainManager = ChainManager(this)
+            chainManager.setCurrentIndex(prevIndex)
+            
+            // Start the previous alarm
+            val prevAlarm = alarms[prevIndex]
+            val delayMillis = prevAlarm.getTotalSeconds() * 1000L
+            val newEndTime = System.currentTimeMillis() + delayMillis
+            
+            // Schedule with AlarmManager
+            alarmScheduler.scheduleAlarm(delayMillis, prevIndex + 1)
+            
+            // Update service state
+            currentIndex = prevIndex
+            totalAlarms = alarms.size
+            currentAlarmName = prevAlarm.name
+            endTime = newEndTime
+            
+            // Update repository
+            val updatedAlarms = alarms.toMutableList()
+            updatedAlarms[prevIndex] = prevAlarm.copy(isActive = true, scheduledTime = newEndTime)
+            repository.saveAlarms(updatedAlarms)
+            
+            // Start countdown for previous alarm
+            startCountdown()
+            
+            Log.d("ChainService", "Previous alarm started successfully")
+        } else {
+            Log.d("ChainService", "Already at first alarm, cannot go back")
+        }
     }
 }

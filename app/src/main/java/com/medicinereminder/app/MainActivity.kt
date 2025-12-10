@@ -146,11 +146,8 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
             isPaused = chainManager.isChainPaused()
             currentChainIndex = chainManager.getCurrentIndex()
             
-            // Check if AlarmService is running (alarm is ringing)
-            val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            isAlarmRinging = activityManager.getRunningServices(Int.MAX_VALUE).any { 
-                it.service.className == "com.medicinereminder.app.AlarmService" 
-            }
+            // Check if alarm is ringing from ChainManager state
+            isAlarmRinging = chainManager.isAlarmRinging()
             
             delay(1000) // Poll every second for updates from Service/Receiver
         }
@@ -192,7 +189,6 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                     StickyChainBar(
                         currentIndex = currentChainIndex,
                         totalAlarms = alarms.size,
-                        currentAlarm = alarms[currentChainIndex],
                         isAlarmRinging = isAlarmRinging,
                         onPause = {
                             android.util.Log.d("MainActivity", "PAUSE button clicked! Sending ACTION_PAUSE_CHAIN intent")
@@ -211,7 +207,6 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                             android.util.Log.d("MainActivity", "Resume intent sent")
                         },
                         isPaused = isPaused,
-                        pausedData = if(isPaused) chainManager.getPausedRemainingTime() else 0L,
                         onStop = {
                             android.util.Log.d("MainActivity", "STOP button clicked! Sending ACTION_STOP_CHAIN intent")
                             val intent = Intent(context, ChainService::class.java).apply {
@@ -230,6 +225,22 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                             }
                             context.sendBroadcast(stopAlarmIntent)
                             android.util.Log.d("MainActivity", "Dismiss broadcast sent")
+                        },
+                        onNext = {
+                            android.util.Log.d("MainActivity", "NEXT button clicked! Sending ACTION_NEXT_ALARM intent")
+                            val intent = Intent(context, ChainService::class.java).apply {
+                                action = ChainService.ACTION_NEXT_ALARM
+                            }
+                            context.startService(intent)
+                            android.util.Log.d("MainActivity", "Next alarm intent sent")
+                        },
+                        onPrev = {
+                            android.util.Log.d("MainActivity", "PREV button clicked! Sending ACTION_PREV_ALARM intent")
+                            val intent = Intent(context, ChainService::class.java).apply {
+                                action = ChainService.ACTION_PREV_ALARM
+                            }
+                            context.startService(intent)
+                            android.util.Log.d("MainActivity", "Prev alarm intent sent")
                         }
                     )
                 }
@@ -366,14 +377,14 @@ fun EmptyState() {
 fun StickyChainBar(
     currentIndex: Int,
     totalAlarms: Int,
-    currentAlarm: Alarm,
     isAlarmRinging: Boolean,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onStop: () -> Unit,
     isPaused: Boolean,
-    pausedData: Long,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onNext: () -> Unit,
+    onPrev: () -> Unit
 ) {
     val context = LocalContext.current
     val chainManager = remember { ChainManager(context) }
@@ -484,6 +495,50 @@ fun StickyChainBar(
             Spacer(modifier = Modifier.height(8.dp))
             
             val remainingSeconds = (remainingTimeMs / 1000).toInt().coerceAtLeast(0)
+            
+            // Navigation buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onPrev,
+                    enabled = currentIndex > 0,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Previous alarm",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("PREV")
+                }
+                
+                Button(
+                    onClick = onNext,
+                    enabled = currentIndex < totalAlarms - 1,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Text("NEXT")
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Next alarm",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
@@ -689,18 +744,20 @@ fun EditAlarmContent(
 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                // Quick presets
+                // Quick Add
                 Text(
                     "Quick Add", 
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                
+                // First row: seconds
                 Row(
                     modifier = Modifier.fillMaxWidth(), 
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    listOf(10, 30, 60, 300).forEach { sec ->
+                    listOf(5, 10, 30, 60).forEach { sec ->
                         OutlinedButton(
                             onClick = {
                                 val currentTotal = alarm.getTotalSeconds()
@@ -710,11 +767,105 @@ fun EditAlarmContent(
                                 val s = newTotal % 60
                                 onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
                             },
-                            contentPadding = PaddingValues(horizontal = 12.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
                         ) {
-                            Text("+${if (sec < 60) "${sec}s" else "${sec/60}m"}")
+                            Text("+${if (sec < 60) "${sec}s" else "${sec/60}m"}", fontSize = 12.sp)
                         }
                     }
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Second row: minutes and hours
+                Row(
+                    modifier = Modifier.fillMaxWidth(), 
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    listOf(300, 1800, 3600).forEach { sec ->
+                        OutlinedButton(
+                            onClick = {
+                                val currentTotal = alarm.getTotalSeconds()
+                                val newTotal = currentTotal + sec
+                                val h = newTotal / 3600
+                                val m = (newTotal % 3600) / 60
+                                val s = newTotal % 60
+                                onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                        ) {
+                            Text("+${if (sec < 3600) "${sec/60}m" else "${sec/3600}h"}", fontSize = 12.sp)
+                        }
+                    }
+                    // Empty space to balance the row
+                    Spacer(modifier = Modifier.weight(1f).padding(horizontal = 2.dp))
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Quick Subtract
+                Text(
+                    "Quick Subtract", 
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // First row: seconds
+                Row(
+                    modifier = Modifier.fillMaxWidth(), 
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    listOf(5, 10, 30, 60).forEach { sec ->
+                        OutlinedButton(
+                            onClick = {
+                                val currentTotal = alarm.getTotalSeconds()
+                                val newTotal = (currentTotal - sec).coerceAtLeast(0)
+                                val h = newTotal / 3600
+                                val m = (newTotal % 3600) / 60
+                                val s = newTotal % 60
+                                onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("-${if (sec < 60) "${sec}s" else "${sec/60}m"}", fontSize = 12.sp)
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Second row: minutes and hours
+                Row(
+                    modifier = Modifier.fillMaxWidth(), 
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    listOf(300, 1800, 3600).forEach { sec ->
+                        OutlinedButton(
+                            onClick = {
+                                val currentTotal = alarm.getTotalSeconds()
+                                val newTotal = (currentTotal - sec).coerceAtLeast(0)
+                                val h = newTotal / 3600
+                                val m = (newTotal % 3600) / 60
+                                val s = newTotal % 60
+                                onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("-${if (sec < 3600) "${sec/60}m" else "${sec/3600}h"}", fontSize = 12.sp)
+                        }
+                    }
+                    // Empty space to balance the row
+                    Spacer(modifier = Modifier.weight(1f).padding(horizontal = 2.dp))
                 }
                 
                 Spacer(modifier = Modifier.height(32.dp))

@@ -9,6 +9,9 @@ import android.util.Log
 class AlarmStopReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == "com.medicinereminder.app.STOP_ALARM") {
+            // Clear alarm ringing state
+            ChainManager(context).setAlarmRinging(false)
+            
             // Stop the alarm service
             val serviceIntent = Intent(context, AlarmService::class.java)
             context.stopService(serviceIntent)
