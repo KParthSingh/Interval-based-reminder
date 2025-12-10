@@ -22,8 +22,53 @@ object NotificationHelper {
         totalSteps: Int,
         remainingSeconds: Int,
         nextAlarmName: String,
-        isPaused: Boolean = false
+        isPaused: Boolean = false,
+        isAlarmRinging: Boolean = false
     ): android.app.Notification {
+        // When alarm is ringing, show STOP action instead of pause/resume
+        if (isAlarmRinging) {
+            val stopAlarmIntent = Intent(context, AlarmStopReceiver::class.java).apply {
+                action = "com.medicinereminder.app.STOP_ALARM"
+            }
+            val stopAlarmPendingIntent = PendingIntent.getBroadcast(
+                context,
+                1,
+                stopAlarmIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            
+            val fullScreenIntent = Intent(context, AlarmRingingActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                fullScreenIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            return NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle("⏰ " + context.getString(R.string.alarm_ringing))
+                .setContentText("Alarm $currentStep of $totalSteps - ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"}")
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setAutoCancel(false)
+                .setOngoing(true)
+                .setContentIntent(fullScreenPendingIntent)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setColor(Color.parseColor("#6750A4"))
+                .addAction(
+                    android.R.drawable.ic_delete,
+                    "STOP",
+                    stopAlarmPendingIntent
+                )
+                .setVibrate(longArrayOf(0, 500, 200, 500))
+                .build()
+        }
+        
+        // Normal countdown state
         val stopIntent = Intent(context, ChainService::class.java).apply {
             action = ChainService.ACTION_STOP_CHAIN
         }

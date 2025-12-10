@@ -13,9 +13,10 @@ class AlarmStopReceiver : BroadcastReceiver() {
             val serviceIntent = Intent(context, AlarmService::class.java)
             context.stopService(serviceIntent)
             
-            // Dismiss the notification
+            // Dismiss both notification IDs for safety (we now use CHAIN_NOTIFICATION_ID)
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
+            notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
             
             // Check if we're in a chain and need to start the next alarm
             val chainManager = ChainManager(context)
@@ -58,8 +59,20 @@ class AlarmStopReceiver : BroadcastReceiver() {
                     )
                     alarmRepository.saveAlarms(updatedAlarms)
                 } else {
-                    // Chain complete
+                    // Chain complete - stop everything
                     chainManager.stopChain()
+                    
+                    // Stop ChainService to remove notification
+                    val stopChainIntent = Intent(context, ChainService::class.java).apply {
+                        action = ChainService.ACTION_STOP_CHAIN
+                    }
+                    context.startService(stopChainIntent)
+                    
+                    // Clear all active alarms in the repository
+                    val clearedAlarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
+                    alarmRepository.saveAlarms(clearedAlarms)
+                    
+                    Log.d("AlarmStopReceiver", "Chain completed - all alarms finished")
                 }
             }
             

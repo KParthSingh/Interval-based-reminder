@@ -44,8 +44,10 @@ class AlarmRingingActivity : ComponentActivity() {
     }
 
     private fun dismissAlarm() {
+        // Dismiss both notification IDs for safety (we now use CHAIN_NOTIFICATION_ID)
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
         notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
+        notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
         
         val serviceIntent = Intent(this, AlarmService::class.java)
         stopService(serviceIntent)

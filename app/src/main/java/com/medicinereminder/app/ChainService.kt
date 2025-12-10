@@ -77,6 +77,20 @@ class ChainService : Service() {
     }
     
     private fun triggerAlarm() {
+        // Update the current notification to alarm ringing state
+        val notification = NotificationHelper.buildChainNotification(
+            this,
+            currentIndex + 1,
+            totalAlarms,
+            0, // remainingSeconds doesn't matter when alarm is ringing
+            currentAlarmName,
+            isPaused = false,
+            isAlarmRinging = true
+        )
+        
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
+        
         // Start the alarm ringing activity
         val intent = Intent(this, AlarmRingingActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -99,10 +113,7 @@ class ChainService : Service() {
         countdownJob?.cancel()
         serviceScope.cancel()
         
-        // We do NOT cancel the notification here automatically if we want it to persist,
-        // but since this service is destroyed when chain stops, we should clean up.
-        // However, AlarmService will take over the notification slot or show its own.
-        // For now, let's clear our specific ID.
+        // Cancel only our unified notification
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
         
@@ -167,10 +178,11 @@ class ChainService : Service() {
                 stopService(stopAlarmIntent)
                 Log.d("ChainService", "AlarmService stop requested")
                 
-                // Dismiss alarm notification if any
+                // Dismiss both notification IDs for safety
                 val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
-                Log.d("ChainService", "Notification canceled")
+                notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
+                Log.d("ChainService", "Notifications canceled")
                 
                 Log.d("ChainService", "Calling stopSelf()...")
                 stopSelf()
