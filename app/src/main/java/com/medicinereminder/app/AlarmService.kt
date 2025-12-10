@@ -106,6 +106,16 @@ class AlarmService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("AlarmService", "onStartCommand with action: ${intent?.action}")
+        
+        // Handle restore notification if user tries to swipe it away
+        if (intent?.action == "RESTORE_NOTIFICATION") {
+            Log.d("AlarmService", "Restoring notification after swipe attempt")
+            val notification = NotificationHelper.buildAlarmNotification(this)
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.notify(NotificationHelper.NOTIFICATION_ID, notification)
+        }
+        
         return START_NOT_STICKY
     }
 }

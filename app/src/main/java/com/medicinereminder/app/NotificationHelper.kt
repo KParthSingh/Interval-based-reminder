@@ -188,6 +188,17 @@ object NotificationHelper {
             "Now"
         }
 
+        // Intent to handle if user tries to swipe away the notification
+        val deleteIntent = Intent(context, AlarmService::class.java).apply {
+            action = "RESTORE_NOTIFICATION"
+        }
+        val deletePendingIntent = PendingIntent.getService(
+            context,
+            2,
+            deleteIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("⏰ " + context.getString(R.string.alarm_ringing))
@@ -197,7 +208,8 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(false)
-            .setOngoing(true)
+            .setOngoing(true)  // Make notification non-dismissible
+            .setDeleteIntent(deletePendingIntent)  // Restore if swiped
             .setContentIntent(pendingIntent)
             .setFullScreenIntent(pendingIntent, true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
