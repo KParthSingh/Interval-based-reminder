@@ -39,6 +39,16 @@ Anyone who’s silently yelling “why does no timer app just do this one simple
 
 If your routine is tied to when you begin, not what time it is, this app is built for you.
 
+# Why existing apps don’t work for this
+
+Normal alarm clock -> Fixed times only
+
+Medisafe, MyTherapy etc. -> Still expect you to set absolute times or “every 8 hours from fixed start”
+
+Countdown timer apps -> Die when screen off, no sequencing, no persistence
+
+Workout timer apps -> Great for intervals but no medication-style snooze/dismiss logic
+
 ## Overview
 
 Medicine Reminder App enables users to create sequences of alarms that trigger automatically at specified intervals. The application provides reliable background execution, comprehensive playback controls, and real-time progress tracking.
