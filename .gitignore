@@ -1,5 +1,8 @@
-# Gradle build directories
+# Gradle build directories and IDE junk (the stuff you never want)
 /build/
 .gradle/
 .idea/
 *.iml
+
+# Specific folders inside app that may cause trouble (like that tmp folder)
+/app/build/

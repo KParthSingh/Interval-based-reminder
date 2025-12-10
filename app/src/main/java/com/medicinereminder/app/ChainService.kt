@@ -91,15 +91,7 @@ class ChainService : Service() {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
         
-        // Start the alarm ringing activity
-        val intent = Intent(this, AlarmRingingActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            // Pass chain info so activity knows we are in a chain
-            putExtra(EXTRA_IS_CHAIN, true)
-        }
-        startActivity(intent)
-        
-        // Start alarm sound service
+        // Start alarm sound service (no full-screen activity)
         val serviceIntent = Intent(this, AlarmService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)

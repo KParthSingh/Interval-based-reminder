@@ -136,6 +136,7 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
     var isChainActive by remember { mutableStateOf(chainManager.isChainActive()) }
     var isPaused by remember { mutableStateOf(chainManager.isChainPaused()) }
     var currentChainIndex by remember { mutableIntStateOf(chainManager.getCurrentIndex()) }
+    var isAlarmRinging by remember { mutableStateOf(false) }
 
     // Sync State Loop
     LaunchedEffect(Unit) {
@@ -144,6 +145,13 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
             isChainActive = chainManager.isChainActive()
             isPaused = chainManager.isChainPaused()
             currentChainIndex = chainManager.getCurrentIndex()
+            
+            // Check if AlarmService is running (alarm is ringing)
+            val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            isAlarmRinging = activityManager.getRunningServices(Int.MAX_VALUE).any { 
+                it.service.className == "com.medicinereminder.app.AlarmService" 
+            }
+            
             delay(1000) // Poll every second for updates from Service/Receiver
         }
     }
@@ -185,6 +193,7 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                         currentIndex = currentChainIndex,
                         totalAlarms = alarms.size,
                         currentAlarm = alarms[currentChainIndex],
+                        isAlarmRinging = isAlarmRinging,
                         onPause = {
                             android.util.Log.d("MainActivity", "PAUSE button clicked! Sending ACTION_PAUSE_CHAIN intent")
                             val intent = Intent(context, ChainService::class.java).apply {
@@ -213,6 +222,14 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                             
                             // Also clear all active alarms
                             alarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
+                        },
+                        onDismiss = {
+                            android.util.Log.d("MainActivity", "DISMISS button clicked! Stopping alarm")
+                            val stopAlarmIntent = Intent(context, AlarmStopReceiver::class.java).apply {
+                                action = "com.medicinereminder.app.STOP_ALARM"
+                            }
+                            context.sendBroadcast(stopAlarmIntent)
+                            android.util.Log.d("MainActivity", "Dismiss broadcast sent")
                         }
                     )
                 }
@@ -350,11 +367,13 @@ fun StickyChainBar(
     currentIndex: Int,
     totalAlarms: Int,
     currentAlarm: Alarm,
+    isAlarmRinging: Boolean,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onStop: () -> Unit,
     isPaused: Boolean,
-    pausedData: Long
+    pausedData: Long,
+    onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val chainManager = remember { ChainManager(context) }
@@ -376,6 +395,28 @@ fun StickyChainBar(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // DISMISS button when alarm is ringing (prominent placement)
+            if (isAlarmRinging) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        "⏰ DISMISS ALARM",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -383,10 +424,14 @@ fun StickyChainBar(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        if (isPaused) "SEQUENCE PAUSED" else stringResource(R.string.chain_active_title),
+                        if (isAlarmRinging) "🔔 ALARM RINGING" 
+                        else if (isPaused) "SEQUENCE PAUSED" 
+                        else stringResource(R.string.chain_active_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        color = if (isAlarmRinging) MaterialTheme.colorScheme.primary
+                               else if (isPaused) MaterialTheme.colorScheme.error 
+                               else MaterialTheme.colorScheme.primary
                     )
                     Text(
                         stringResource(R.string.chain_info_format, currentIndex + 1, totalAlarms),
@@ -394,35 +439,37 @@ fun StickyChainBar(
                     )
                 }
                 
-                Row {
-                    Button(
-                        onClick = { if (isPaused) onResume() else onPause() },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isPaused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = if (isPaused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) {
-                        Icon(
-                            if (isPaused) Icons.Default.PlayArrow else androidx.compose.material.icons.Icons.Default.Info,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (isPaused) "RESUME" else "PAUSE")
-                    }
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    Button(
-                        onClick = onStop,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.error
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) {
-                        Text("STOP")
+                if (!isAlarmRinging) {
+                    Row {
+                        Button(
+                            onClick = { if (isPaused) onResume() else onPause() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isPaused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = if (isPaused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Icon(
+                                if (isPaused) Icons.Default.PlayArrow else androidx.compose.material.icons.Icons.Default.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isPaused) "RESUME" else "PAUSE")
+                        }
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Button(
+                            onClick = onStop,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Text("STOP")
+                        }
                     }
                 }
             }
