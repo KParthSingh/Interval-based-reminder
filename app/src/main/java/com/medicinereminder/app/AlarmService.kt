@@ -22,27 +22,10 @@ class AlarmService : Service() {
 
         // Create notification channel
         NotificationHelper.createNotificationChannel(this)
-
-        // Get the current chain info from ChainManager
-        val chainManager = ChainManager(this)
-        val currentIndex = chainManager.getCurrentIndex()
         
-        // Get alarm info from repository
-        val alarmRepository = AlarmRepository(this)
-        val alarms = alarmRepository.loadAlarms()
-        val currentAlarmName = if (currentIndex < alarms.size) alarms[currentIndex].name else ""
-        
-        // Start as foreground service using the unified chain notification in alarm state
-        val notification = NotificationHelper.buildChainNotification(
-            this,
-            currentIndex + 1,
-            alarms.size,
-            0, // remainingSeconds doesn't matter when alarm is ringing
-            currentAlarmName,
-            isPaused = false,
-            isAlarmRinging = true
-        )
-        startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
+        // Start as foreground service with ALARM notification
+        val notification = NotificationHelper.buildAlarmNotification(this)
+        startForeground(NotificationHelper.NOTIFICATION_ID, notification)
 
         // Start playing alarm sound
         playAlarmSound()

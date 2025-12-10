@@ -77,24 +77,26 @@ class ChainService : Service() {
     }
     
     private fun triggerAlarm() {
-        // Update the current notification to alarm ringing state
-        val notification = NotificationHelper.buildChainNotification(
-            this,
-            currentIndex + 1,
-            totalAlarms,
-            0, // remainingSeconds doesn't matter when alarm is ringing
-            currentAlarmName,
-            isPaused = false,
-            isAlarmRinging = true
-        )
+        Log.d("ChainService", "triggerAlarm() - Exiting foreground mode")
         
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
+        // FIRST: Cancel the countdown job to stop any further notification updates
+        countdownJob?.cancel()
+        countdownJob = null
+        
+        // SECOND: Exit foreground mode and remove the notification
+        // This is KEY - while ChainService is foreground, Android keeps the notification alive
+        // We exit foreground but keep the service running in background
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         
         // Set alarm ringing state
         ChainManager(this).setAlarmRinging(true)
         
-        // Start alarm sound service (no full-screen activity)
+        // THIRD: Start alarm sound service (which will create its own ALARM notification)
         val serviceIntent = Intent(this, AlarmService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
