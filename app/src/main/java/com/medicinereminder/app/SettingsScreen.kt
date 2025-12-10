@@ -24,6 +24,7 @@ fun SettingsScreen(
     
     var selectedTheme by remember { mutableStateOf(repository.getThemeMode()) }
     var closeOnStart by remember { mutableStateOf(repository.getCloseOnStart()) }
+    var hideStopButton by remember { mutableStateOf(repository.getHideStopButton()) }
     
     Scaffold(
         topBar = {
@@ -219,6 +220,35 @@ fun SettingsScreen(
                             onCheckedChange = { enabled ->
                                 closeOnStart = enabled
                                 repository.setCloseOnStart(enabled)
+                            }
+                        )
+                    }
+                    
+                    Divider()
+                    
+                    // Hide Stop Button Option
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Hide Stop Button",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "Remove stop button from countdown notification",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = hideStopButton,
+                            onCheckedChange = { enabled ->
+                                hideStopButton = enabled
+                                repository.setHideStopButton(enabled)
                             }
                         )
                     }

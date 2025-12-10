@@ -128,13 +128,18 @@ object NotificationHelper {
                 nextPendingIntent
             )
         }
-            
-        return builder.addAction(
+        
+        // Conditionally add STOP button based on settings
+        val settingsRepository = SettingsRepository(context)
+        if (!settingsRepository.getHideStopButton()) {
+            builder.addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 "STOP SEQUENCE",
                 stopPendingIntent
             )
-            .build()
+        }
+            
+        return builder.build()
     }
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

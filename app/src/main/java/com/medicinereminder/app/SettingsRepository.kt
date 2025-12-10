@@ -8,6 +8,7 @@ class SettingsRepository(context: Context) {
     companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_CLOSE_ON_START = "close_on_start"
+        const val KEY_HIDE_STOP_BUTTON = "hide_stop_button"
         
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
@@ -28,5 +29,13 @@ class SettingsRepository(context: Context) {
     
     fun setCloseOnStart(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_CLOSE_ON_START, enabled).apply()
+    }
+    
+    fun getHideStopButton(): Boolean {
+        return prefs.getBoolean(KEY_HIDE_STOP_BUTTON, false)
+    }
+    
+    fun setHideStopButton(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_HIDE_STOP_BUTTON, enabled).apply()
     }
 }
