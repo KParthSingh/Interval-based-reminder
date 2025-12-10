@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -63,16 +64,28 @@ class MainActivity : ComponentActivity() {
         checkExactAlarmPermission()
 
         setContent {
-            MedicineReminderTheme {
+            val settingsRepository = remember { SettingsRepository(this) }
+            var themeMode by remember { mutableStateOf(settingsRepository.getThemeMode()) }
+            var showSettings by remember { mutableStateOf(false) }
+            
+            MedicineReminderTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreen(
-                        onScheduleAlarm = { delayMillis, requestCode, name, current, total ->
-                            scheduleAlarm(delayMillis, requestCode, name, current, total)
-                        }
-                    )
+                    if (showSettings) {
+                        SettingsScreen(
+                            onNavigateBack = { showSettings = false },
+                            onThemeChanged = { themeMode = settingsRepository.getThemeMode() }
+                        )
+                    } else {
+                        MainScreen(
+                            onScheduleAlarm = { delayMillis, requestCode, name, current, total ->
+                                scheduleAlarm(delayMillis, requestCode, name, current, total)
+                            },
+                            onOpenSettings = { showSettings = true }
+                        )
+                    }
                 }
             }
         }
@@ -127,7 +140,10 @@ class MainActivity : ComponentActivity() {
 // --- MAIN SCREEN ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
+fun MainScreen(
+    onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit,
+    onOpenSettings: () -> Unit
+) {
     val context = LocalContext.current
     val repository = remember { AlarmRepository(context) }
     var alarms by remember { mutableStateOf(repository.loadAlarms()) }
@@ -165,6 +181,15 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                         stringResource(R.string.title_main),
                         fontWeight = FontWeight.Bold 
                     ) 
+                },
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -253,6 +278,7 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                          val anyActive = alarms.any { it.isActive }
+                         val settingsRepository = remember { SettingsRepository(context) }
                          Button(
                             onClick = {
                                 chainManager.startChain()
@@ -262,11 +288,21 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                                 alarms = alarms.toMutableList().apply {
                                     set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
                                 }
+                                
+                                // Check if close-on-start is enabled
+                                if (settingsRepository.getCloseOnStart()) {
+                                    // Move app to background (go to home screen)
+                                    val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                                        addCategory(Intent.CATEGORY_HOME)
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(homeIntent)
+                                }
                             },
                             enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp)
-                        ) {
+                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(stringResource(R.string.start_chain_btn), fontWeight = FontWeight.Bold)
                                 Text(

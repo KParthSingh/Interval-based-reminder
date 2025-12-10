@@ -70,11 +70,18 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun MedicineReminderTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: String = "auto", // "light", "dark", or "auto"
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val systemInDarkTheme = isSystemInDarkTheme()
+    val darkTheme = when (themeMode) {
+        "light" -> false
+        "dark" -> true
+        else -> systemInDarkTheme // auto follows system
+    }
+    
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
