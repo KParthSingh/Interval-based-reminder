@@ -25,6 +25,7 @@ fun SettingsScreen(
     var selectedTheme by remember { mutableStateOf(repository.getThemeMode()) }
     var closeOnStart by remember { mutableStateOf(repository.getCloseOnStart()) }
     var hideStopButton by remember { mutableStateOf(repository.getHideStopButton()) }
+    var dismissableCounter by remember { mutableStateOf(repository.getDismissableCounter()) }
     
     var themeExpanded by remember { mutableStateOf(false) }
     
@@ -184,6 +185,34 @@ fun SettingsScreen(
                             onCheckedChange = { enabled ->
                                 hideStopButton = enabled
                                 repository.setHideStopButton(enabled)
+                            }
+                        )
+                    }
+                    
+                    Divider()
+                    
+                    // Dismissable Counter Notification Option
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Dismissable Counter Notification",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                "Makes the countdown notification dismissable. Once dismissed, only the alarm notification will appear",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = dismissableCounter,
+                            onCheckedChange = { enabled ->
+                                dismissableCounter = enabled
+                                repository.setDismissableCounter(enabled)
                             }
                         )
                     }

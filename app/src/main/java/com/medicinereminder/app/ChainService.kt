@@ -15,6 +15,8 @@ class ChainService : Service() {
     private var currentIndex: Int = 0
     private var totalAlarms: Int = 0
     private var currentAlarmName: String = ""
+    private var notificationDismissed: Boolean = false
+    private var isDismissableMode: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
@@ -24,9 +26,23 @@ class ChainService : Service() {
 
 
 
-    private fun startCountdown() {
+
+
+    private fun startCountdown(resetDismissalState: Boolean = true) {
+        // Check if we're in dismissable mode
+        val settingsRepository = SettingsRepository(this)
+        isDismissableMode = settingsRepository.getDismissableCounter()
+        
+        // Only reset dismissal state if requested (true for new sequences, false for resume)
+        if (resetDismissalState) {
+            notificationDismissed = false
+        }
+        
         // Start as foreground service with initial notification
-        updateNotification()
+        updateChainManager()
+        if (shouldShowNotification()) {
+            showNotification()
+        }
 
         // Start countdown updates
         countdownJob?.cancel()
@@ -35,8 +51,13 @@ class ChainService : Service() {
                 delay(1000)
                 if (!isActive) break
                 
-                // Update notification every second so timer shows live countdown
-                updateNotification()
+                // ALWAYS update ChainManager for UI
+                updateChainManager()
+                
+                // Conditionally show notification
+                if (shouldShowNotification()) {
+                    showNotification()
+                }
             }
             
             if (isActive) {
@@ -46,33 +67,68 @@ class ChainService : Service() {
             }
         }
     }
-
-    private fun updateNotification() {
-        val remaining = ((endTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
+    
+    // Single source of truth for remaining time
+    private fun getRemainingTime(): Int {
+        return ((endTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
+    }
+    
+    // Always update ChainManager - keeps UI timer alive
+    private fun updateChainManager() {
+        ChainManager(this).setCurrentRemainingTime(getRemainingTime() * 1000L)
+    }
+    
+    // Check if we should show notification (respects dismissal)
+    private fun shouldShowNotification(): Boolean {
+        if (!isDismissableMode) {
+            return true // Always show in non-dismissable mode
+        }
         
-        // Update ChainManager with current remaining time (single source of truth)
-        ChainManager(this).setCurrentRemainingTime(remaining * 1000L)
+        // In dismissable mode, check if user dismissed it
+        if (notificationDismissed) {
+            return false // Don't show if dismissed
+        }
         
+        // Check if notification is still active
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val activeNotifications = notificationManager.activeNotifications
+        val isNotificationActive = activeNotifications.any { it.id == NotificationHelper.CHAIN_NOTIFICATION_ID }
+        
+        if (!isNotificationActive) {
+            // User dismissed it
+            notificationDismissed = true
+            Log.d("ChainService", "Notification dismissed by user")
+            return false
+        }
+        
+        return true // Show notification
+    }
+    
+    // Build and post notification
+    private fun showNotification(isPaused: Boolean = false) {
         val notification = NotificationHelper.buildChainNotification(
             this,
             currentIndex + 1,
             totalAlarms,
-            remaining,
-            currentAlarmName
+            getRemainingTime(),
+            currentAlarmName,
+            isPaused
         )
         
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
         
-        // Ensure we are in foreground
-        try {
-             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            } else {
-                startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
+        // Use foreground service only in non-dismissable mode
+        if (!isDismissableMode) {
+            try {
+                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                } else {
+                    startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
+                }
+            } catch (e: Exception) {
+                Log.e("ChainService", "Error starting foreground", e)
             }
-        } catch (e: Exception) {
-            Log.e("ChainService", "Error starting foreground", e)
         }
     }
     
@@ -230,15 +286,18 @@ class ChainService : Service() {
         Log.d("ChainService", "Canceling AlarmManager alarm with requestCode: $requestCode")
         alarmScheduler.cancelAlarm(requestCode)
         
-        val remaining = ((endTime - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+        val remaining = getRemainingTime()
         Log.d("ChainService", "Remaining time: ${remaining}s (${remaining * 1000}ms)")
         
         Log.d("ChainService", "Before pause - isPaused: ${ChainManager(this).isChainPaused()}")
-        ChainManager(this).pauseChain(remaining * 1000)
+        ChainManager(this).pauseChain(remaining * 1000L)
         Log.d("ChainService", "After pause - isPaused: ${ChainManager(this).isChainPaused()}")
         Log.d("ChainService", "Saved remaining time: ${ChainManager(this).getPausedRemainingTime()}ms")
         
-        showPausedNotification()
+        // Only show paused notification if not dismissed
+        if (shouldShowNotification()) {
+            showNotification(isPaused = true)
+        }
         Log.d("ChainService", "Pause complete")
     }
 
@@ -261,30 +320,12 @@ class ChainService : Service() {
         ChainManager(this).resumeChain()
         Log.d("ChainService", "After resume - isPaused: ${ChainManager(this).isChainPaused()}")
         
-        Log.d("ChainService", "Restarting countdown...")
-        startCountdown()
+        // Preserve dismissal state across pause/resume
+        Log.d("ChainService", "Restarting countdown (preserving dismissal state)...")
+        startCountdown(resetDismissalState = false)
         Log.d("ChainService", "Resume complete")
     }
 
-    private fun showPausedNotification() {
-        val remainingTimeMs = ChainManager(this).getPausedRemainingTime()
-        val remainingSeconds = (remainingTimeMs / 1000).toInt()
-        
-        // Update ChainManager with current remaining time (frozen while paused)
-        ChainManager(this).setCurrentRemainingTime(remainingTimeMs)
-        
-        val notification = NotificationHelper.buildChainNotification(
-            this,
-            currentIndex + 1,
-            totalAlarms,
-            remainingSeconds,
-            currentAlarmName,
-            isPaused = true
-        )
-        
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
-    }
     
     private fun handleNextAlarm() {
         Log.d("ChainService", "handleNextAlarm() called")

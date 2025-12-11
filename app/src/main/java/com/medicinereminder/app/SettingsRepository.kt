@@ -9,6 +9,7 @@ class SettingsRepository(context: Context) {
         const val KEY_THEME = "theme_mode"
         const val KEY_CLOSE_ON_START = "close_on_start"
         const val KEY_HIDE_STOP_BUTTON = "hide_stop_button"
+        const val KEY_DISMISSABLE_COUNTER = "dismissable_counter"
         
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
@@ -37,5 +38,13 @@ class SettingsRepository(context: Context) {
     
     fun setHideStopButton(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_HIDE_STOP_BUTTON, enabled).apply()
+    }
+    
+    fun getDismissableCounter(): Boolean {
+        return prefs.getBoolean(KEY_DISMISSABLE_COUNTER, false)
+    }
+    
+    fun setDismissableCounter(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DISMISSABLE_COUNTER, enabled).apply()
     }
 }

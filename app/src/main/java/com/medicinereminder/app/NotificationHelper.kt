@@ -83,9 +83,14 @@ object NotificationHelper {
                        else if (minutes > 0) String.format("%d:%02d", minutes, seconds)
                        else "${seconds}s"
 
+
         val title = "Sequence: $currentStep of $totalSteps ${if(isPaused) "(PAUSED)" else ""}"
         val content = if (isPaused) "Tap RESUME to continue." else "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"} in $timeText"
 
+        // Get settings repository for notification configuration
+        val settingsRepository = SettingsRepository(context)
+        val isDismissable = settingsRepository.getDismissableCounter()
+        
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(title)
@@ -93,7 +98,7 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setAutoCancel(false)
-            .setOngoing(true)
+            .setOngoing(!isDismissable)  // Only ongoing if NOT dismissable
             .setOnlyAlertOnce(true)
             .setColor(Color.parseColor("#6750A4"))
         
@@ -130,7 +135,6 @@ object NotificationHelper {
         }
         
         // Conditionally add STOP button based on settings
-        val settingsRepository = SettingsRepository(context)
         if (!settingsRepository.getHideStopButton()) {
             builder.addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
@@ -138,6 +142,7 @@ object NotificationHelper {
                 stopPendingIntent
             )
         }
+
             
         return builder.build()
     }
