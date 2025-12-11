@@ -199,11 +199,11 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Dismissable Counter Notification",
+                                "Hide Counter Notification",
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                "Makes the countdown notification dismissable. Once dismissed, only the alarm notification will appear",
+                                "Hides the countdown notification completely. Only the alarm notification will appear when each alarm rings",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
