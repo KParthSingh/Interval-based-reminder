@@ -74,7 +74,11 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    // Handle back button when settings is open
                     if (showSettings) {
+                        androidx.activity.compose.BackHandler {
+                            showSettings = false
+                        }
                         SettingsScreen(
                             onNavigateBack = { showSettings = false },
                             onThemeChanged = { themeMode = settingsRepository.getThemeMode() }
@@ -271,47 +275,45 @@ fun MainScreen(
                     )
                 }
             } else if (alarms.isNotEmpty()) {
-                // Persistent Start Button at bottom
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 2.dp,
-                    shadowElevation = 8.dp
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                         val anyActive = alarms.any { it.isActive }
-                         val settingsRepository = remember { SettingsRepository(context) }
-                         Button(
-                            onClick = {
-                                chainManager.startChain()
-                                val firstAlarm = alarms[0]
-                                val delay = firstAlarm.getTotalSeconds() * 1000L
-                                onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size)
-                                alarms = alarms.toMutableList().apply {
-                                    set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
-                                }
-                                
-                                // Check if close-on-start is enabled
-                                if (settingsRepository.getCloseOnStart()) {
-                                    // Move app to background (go to home screen)
-                                    val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                                        addCategory(Intent.CATEGORY_HOME)
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(homeIntent)
-                                }
-                            },
-                            enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                            shape = RoundedCornerShape(12.dp)
-                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(stringResource(R.string.start_chain_btn), fontWeight = FontWeight.Bold)
-                                Text(
-                                    stringResource(R.string.start_chain_subtitle, alarms.size),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
+                // Persistent Start Button at bottom - fills entire bottom bar
+                val anyActive = alarms.any { it.isActive }
+                val settingsRepository = remember { SettingsRepository(context) }
+                Button(
+                    onClick = {
+                        chainManager.startChain()
+                        val firstAlarm = alarms[0]
+                        val delay = firstAlarm.getTotalSeconds() * 1000L
+                        onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size)
+                        alarms = alarms.toMutableList().apply {
+                            set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
                         }
+                        
+                        // Check if close-on-start is enabled
+                        if (settingsRepository.getCloseOnStart()) {
+                            // Move app to background (go to home screen)
+                            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                                addCategory(Intent.CATEGORY_HOME)
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(homeIntent)
+                        }
+                    },
+                    enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.start_chain_btn), fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(R.string.start_chain_subtitle, alarms.size),
+                            style = MaterialTheme.typography.labelSmall
+                        )
                     }
                 }
             }

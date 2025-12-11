@@ -26,6 +26,14 @@ fun SettingsScreen(
     var closeOnStart by remember { mutableStateOf(repository.getCloseOnStart()) }
     var hideStopButton by remember { mutableStateOf(repository.getHideStopButton()) }
     
+    var themeExpanded by remember { mutableStateOf(false) }
+    
+    val themeOptions = mapOf(
+        SettingsRepository.THEME_LIGHT to "Light",
+        SettingsRepository.THEME_DARK to "Dark",
+        SettingsRepository.THEME_AUTO to "Auto"
+    )
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -53,7 +61,7 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Theme Section
             Card(
@@ -68,105 +76,42 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        "🎨 Theme",
-                        style = MaterialTheme.typography.titleLarge,
+                        "Theme",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     
-                    Text(
-                        "Choose your preferred color scheme",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Light Mode Option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    ExposedDropdownMenuBox(
+                        expanded = themeExpanded,
+                        onExpandedChange = { themeExpanded = it }
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "☀️ Light Mode",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                "Bright and clear",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        RadioButton(
-                            selected = selectedTheme == SettingsRepository.THEME_LIGHT,
-                            onClick = {
-                                selectedTheme = SettingsRepository.THEME_LIGHT
-                                repository.setThemeMode(SettingsRepository.THEME_LIGHT)
-                                onThemeChanged()
-                            }
+                        OutlinedTextField(
+                            value = themeOptions[selectedTheme] ?: "Auto",
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                         )
-                    }
-                    
-                    Divider()
-                    
-                    // Dark Mode Option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "🌙 Dark Mode",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                "Easy on the eyes",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        RadioButton(
-                            selected = selectedTheme == SettingsRepository.THEME_DARK,
-                            onClick = {
-                                selectedTheme = SettingsRepository.THEME_DARK
-                                repository.setThemeMode(SettingsRepository.THEME_DARK)
-                                onThemeChanged()
+                        ExposedDropdownMenu(
+                            expanded = themeExpanded,
+                            onDismissRequest = { themeExpanded = false }
+                        ) {
+                            themeOptions.forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        selectedTheme = value
+                                        repository.setThemeMode(value)
+                                        onThemeChanged()
+                                        themeExpanded = false
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                                )
                             }
-                        )
-                    }
-                    
-                    Divider()
-                    
-                    // Auto Mode Option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "🔄 Auto",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                "Follow system theme",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
-                        RadioButton(
-                            selected = selectedTheme == SettingsRepository.THEME_AUTO,
-                            onClick = {
-                                selectedTheme = SettingsRepository.THEME_AUTO
-                                repository.setThemeMode(SettingsRepository.THEME_AUTO)
-                                onThemeChanged()
-                            }
-                        )
                     }
                 }
             }
@@ -184,20 +129,12 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        "⚙️ Behavior",
-                        style = MaterialTheme.typography.titleLarge,
+                        "Behavior",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     
-                    Text(
-                        "Customize app behavior",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Close on Start Option
+                    // Minimize on Start Option
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -206,11 +143,10 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "Minimize on Start",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
+                                style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                "Move app to background when starting chain sequence",
+                                "When you click start chain sequence it will minimize the app to home screen",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -235,11 +171,10 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "Hide Stop Button",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
+                                style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                "Remove stop button from countdown notification",
+                                "Hides the stop sequence button so you can't accidentally click it",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
