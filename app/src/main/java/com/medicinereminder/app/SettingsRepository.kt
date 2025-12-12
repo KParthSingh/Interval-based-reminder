@@ -10,6 +10,7 @@ class SettingsRepository(context: Context) {
         const val KEY_CLOSE_ON_START = "close_on_start"
         const val KEY_HIDE_STOP_BUTTON = "hide_stop_button"
         const val KEY_DISMISSABLE_COUNTER = "dismissable_counter"
+        const val KEY_BATTERY_WARNING_NEVER_SHOW = "battery_warning_never_show"
         
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
@@ -46,5 +47,13 @@ class SettingsRepository(context: Context) {
     
     fun setDismissableCounter(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_DISMISSABLE_COUNTER, enabled).apply()
+    }
+    
+    fun getBatteryWarningNeverShow(): Boolean {
+        return prefs.getBoolean(KEY_BATTERY_WARNING_NEVER_SHOW, false)
+    }
+    
+    fun setBatteryWarningNeverShow(neverShow: Boolean) {
+        prefs.edit().putBoolean(KEY_BATTERY_WARNING_NEVER_SHOW, neverShow).apply()
     }
 }

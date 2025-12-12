@@ -359,7 +359,8 @@ fun MainScreen(
                 .padding(16.dp)
         ) {
 
-
+            // Battery Optimization Warning
+            BatteryOptimizationWarning()
 
             // ALARMS LIST
             if (alarms.isEmpty()) {
@@ -441,6 +442,130 @@ fun EmptyState() {
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+fun BatteryOptimizationWarning() {
+    val context = LocalContext.current
+    val settingsRepository = remember { SettingsRepository(context) }
+    
+    // Track visibility state
+    var isVisible by remember { mutableStateOf(false) }
+    
+    // Check if warning should be shown
+    LaunchedEffect(Unit) {
+        val showWarning = ManufacturerDetector.requiresAutostartWarning() && 
+                         !settingsRepository.getBatteryWarningNeverShow()
+        isVisible = showWarning
+    }
+    
+    if (isVisible) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            ),
+            elevation = CardDefaults.cardElevation(2.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Title
+                Text(
+                    text = stringResource(R.string.battery_warning_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                
+                // Description
+                Text(
+                    text = stringResource(R.string.battery_warning_message),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                
+                // Buttons Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Open Settings Button
+                    OutlinedButton(
+                        onClick = {
+                            AutostartHelper.openAutostartSettings(context)
+                        },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.battery_warning_btn_settings),
+                            fontSize = 12.sp
+                        )
+                    }
+                    
+                    // Autostart Enabled Button
+                    Button(
+                        onClick = {
+                            settingsRepository.setBatteryWarningNeverShow(true)
+                            isVisible = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.battery_warning_btn_enabled),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                
+                // Secondary buttons row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Hide for Now Button
+                    TextButton(
+                        onClick = {
+                            isVisible = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.battery_warning_btn_hide),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                    
+                    // Never Show Again Button
+                    TextButton(
+                        onClick = {
+                            settingsRepository.setBatteryWarningNeverShow(true)
+                            isVisible = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.battery_warning_btn_never),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Relative interval timer</string>
-    <string name="title_main">"Guys naming title or app is hard"</string>
+    <string name="title_main">"Guys naming app/title is hard"</string>
     <string name="btn_new_alarm">Add Alarm</string>
     <string name="start_alarm_now">Start</string>
     <string name="alarm_in_10_seconds">Alarm in 10 Seconds</string>
@@ -33,4 +33,12 @@
     <string name="chain_remaining_format">%1$d alarm(s) remaining in sequence</string>
     <string name="start_chain_btn">Start Chain Sequence</string>
     <string name="start_chain_subtitle">Total %1$d alarms</string>
+    
+    <!-- Battery Optimization Warning -->
+    <string name="battery_warning_title">IMPORTANT: Enable Autostart</string>
+    <string name="battery_warning_message">"If you're seeing this message it means you're (probably) using a phone with aggressive battery management. In order for this app to run alarms in the background you should enable autostart. I'm not trying to hack into your phone okay? pinky promise."</string>
+    <string name="battery_warning_btn_settings">Open Settings</string>
+    <string name="battery_warning_btn_enabled">Autostart Enabled</string>
+    <string name="battery_warning_btn_hide">Hide for now</string>
+    <string name="battery_warning_btn_never">Don\'t Show Again</string>
 </resources>
