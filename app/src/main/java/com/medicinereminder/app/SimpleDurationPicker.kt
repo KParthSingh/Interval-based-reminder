@@ -30,6 +30,28 @@ fun SimpleDurationPicker(
     seconds: Int,
     onTimeChange: (Int, Int, Int) -> Unit
 ) {
+    // Use internal state to prevent race conditions when props update
+    var internalHours by remember { mutableIntStateOf(hours) }
+    var internalMinutes by remember { mutableIntStateOf(minutes) }
+    var internalSeconds by remember { mutableIntStateOf(seconds) }
+    
+    // Sync external changes to internal state
+    LaunchedEffect(hours) {
+        if (internalHours != hours) {
+            internalHours = hours
+        }
+    }
+    LaunchedEffect(minutes) {
+        if (internalMinutes != minutes) {
+            internalMinutes = minutes
+        }
+    }
+    LaunchedEffect(seconds) {
+        if (internalSeconds != seconds) {
+            internalSeconds = seconds
+        }
+    }
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -39,10 +61,13 @@ fun SimpleDurationPicker(
     ) {
         // Hours
         SimpleWheel(
-            value = hours,
+            value = internalHours,
             range = 0..23,
             label = "Hr",
-            onValueChange = { onTimeChange(it, minutes, seconds) }
+            onValueChange = { 
+                internalHours = it
+                onTimeChange(it, internalMinutes, internalSeconds)
+            }
         )
         
         Spacer(modifier = Modifier.width(16.dp))
@@ -51,10 +76,13 @@ fun SimpleDurationPicker(
 
         // Minutes
         SimpleWheel(
-            value = minutes,
+            value = internalMinutes,
             range = 0..59,
             label = "Min",
-            onValueChange = { onTimeChange(hours, it, seconds) }
+            onValueChange = { 
+                internalMinutes = it
+                onTimeChange(internalHours, it, internalSeconds)
+            }
         )
 
         Spacer(modifier = Modifier.width(16.dp))
@@ -63,10 +91,13 @@ fun SimpleDurationPicker(
 
         // Seconds
         SimpleWheel(
-            value = seconds,
+            value = internalSeconds,
             range = 0..59,
             label = "Sec",
-            onValueChange = { onTimeChange(hours, minutes, it) }
+            onValueChange = { 
+                internalSeconds = it
+                onTimeChange(internalHours, internalMinutes, it)
+            }
         )
     }
 }

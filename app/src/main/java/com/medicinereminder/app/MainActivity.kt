@@ -46,6 +46,8 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import com.medicinereminder.app.ui.theme.MedicineReminderTheme
 import java.util.Locale
+import java.text.SimpleDateFormat
+import java.util.Date
 
 class MainActivity : ComponentActivity() {
     private lateinit var alarmScheduler: AlarmScheduler
@@ -242,7 +244,10 @@ fun MainScreen(
                 ExtendedFloatingActionButton(
                     onClick = { 
                         val defaultSeconds = settingsRepository.getDefaultAlarmTime()
-                        alarms = alarms + Alarm(seconds = defaultSeconds)
+                        val h = defaultSeconds / 3600
+                        val m = (defaultSeconds % 3600) / 60
+                        val s = defaultSeconds % 60
+                        alarms = alarms + Alarm(hours = h, minutes = m, seconds = s)
                     },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -258,6 +263,7 @@ fun MainScreen(
                         currentIndex = currentChainIndex,
                         totalAlarms = alarms.size,
                         isAlarmRinging = isAlarmRinging,
+                        alarms = alarms,
                         onPause = {
                             android.util.Log.d("MainActivity", "PAUSE button clicked! Sending ACTION_PAUSE_CHAIN intent")
                             val intent = Intent(context, ChainService::class.java).apply {
@@ -607,6 +613,7 @@ fun StickyChainBar(
     currentIndex: Int,
     totalAlarms: Int,
     isAlarmRinging: Boolean,
+    alarms: List<Alarm>,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onStop: () -> Unit,
@@ -775,8 +782,19 @@ fun StickyChainBar(
                     color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                 )
 
+                // Calculate when the last alarm will trigger
+                val totalRemainingTimeMs = if (currentIndex < alarms.size) {
+                    // Sum up remaining time for current alarm plus all future alarms
+                    remainingTimeMs + alarms.subList(currentIndex + 1, alarms.size).sumOf { it.getTotalSeconds() * 1000L }
+                } else {
+                    0L
+                }
+                val lastAlarmTime = System.currentTimeMillis() + totalRemainingTimeMs
+                val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+                val formattedTime = timeFormat.format(Date(lastAlarmTime))
+                
                 Text(
-                    stringResource(R.string.chain_remaining_format, totalAlarms - currentIndex - 1),
+                    "Last alarm: $formattedTime",
                     style = MaterialTheme.typography.labelSmall
                 )
             }
