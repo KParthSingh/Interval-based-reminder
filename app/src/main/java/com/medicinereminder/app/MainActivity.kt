@@ -706,11 +706,11 @@ fun StickyChainBar(
                         
                         Spacer(modifier = Modifier.width(8.dp))
                         
-                        FilledTonalButton(
+                        Button(
                             onClick = onStop,
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
