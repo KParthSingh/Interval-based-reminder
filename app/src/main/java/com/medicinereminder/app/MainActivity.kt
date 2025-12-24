@@ -1100,8 +1100,8 @@ fun AlarmItem(
     var showSoundPicker by remember { mutableStateOf(false) }
     var showJumpConfirmation by remember { mutableStateOf(false) }
     
-    // Calculate current progress for visual display
-    var displayProgress by remember { mutableFloatStateOf(alarm.getProgress()) }
+    
+    // Track remaining time for text display
     var remainingTime by remember { mutableIntStateOf(alarm.getTotalSeconds()) }
     
     // CRITICAL: Unified State Synchronization - Single Source of Truth
@@ -1212,20 +1212,6 @@ fun AlarmItem(
         }
     }
     
-    // Loop 2: Animation Update (60fps / High Refresh Rate)
-    LaunchedEffect(alarm.state, alarm.isActive, alarm.scheduledTime, alarm.pausedRemainingMs) {
-        if (alarm.state == AlarmState.RUNNING && alarm.isActive) {
-            while (isActive) {
-                withFrameMillis { 
-                     displayProgress = alarm.getProgress()
-                }
-            }
-        } else if (alarm.state == AlarmState.PAUSED) {
-            displayProgress = alarm.getProgress()
-        } else if (alarm.state == AlarmState.EXPIRED) {
-            displayProgress = 1f
-        }
-    }
     
     // Sound picker launcher
     val soundPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -1517,8 +1503,11 @@ fun AlarmItem(
                     ) {
                         // Progress circle
                         com.medicinereminder.app.ui.TimerCircleView(
-                            progress = displayProgress,
+                            scheduledTime = alarm.scheduledTime,
+                            totalDuration = alarm.getTotalSeconds() * 1000L,
                             isExpired = alarm.state == AlarmState.EXPIRED,
+                            isPaused = alarm.state == AlarmState.PAUSED,
+                            pausedRemainingMs = alarm.pausedRemainingMs,
                             modifier = Modifier.fillMaxSize().padding(4.dp)
                         )
                         
