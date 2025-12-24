@@ -515,6 +515,7 @@ fun MainScreen(
                     .pointerInput(Unit) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { offset ->
+                                if (isChainActive) return@detectDragGesturesAfterLongPress
                                 val listCoords = listCoordinates ?: return@detectDragGesturesAfterLongPress
                                 // Convert tap to root to find the hit item
                                 val rootOffset = listCoords.localToRoot(offset)
@@ -655,13 +656,12 @@ fun MainScreen(
                                 },
                                 onSchedule = { delay ->
                                     onScheduleAlarm(delay, index + 1, alarm.name, index, 1, false) 
-                                    alarms = alarms.toMutableList().apply {
-                                        set(index, alarm.copy(
-                                            isActive = true,
-                                            scheduledTime = System.currentTimeMillis() + delay
-                                        ))
-                                    }
+                                    alarms = alarms.toMutableList().apply { set(index, alarm.copy(
+                                        isActive = true,
+                                        scheduledTime = System.currentTimeMillis() + delay
+                                    )) }
                                 },
+                                isEditable = !isChainActive,
                                 onDelete = {
                                     alarms = alarms.toMutableList().apply { removeAt(index) }
                                 },
@@ -1104,6 +1104,7 @@ fun AlarmItem(
     onUpdate: (Alarm) -> Unit,
     onSchedule: (Long) -> Unit,
     onDelete: () -> Unit,
+    isEditable: Boolean = true,
     modifier: Modifier = Modifier,
     onClone: () -> Unit
 ) {
@@ -1275,7 +1276,7 @@ fun AlarmItem(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { showNameDialog = true }
+                        .clickable(enabled = isEditable) { showNameDialog = true }
                         .padding(6.dp)
                 ) {
                     Icon(
@@ -1311,16 +1312,18 @@ fun AlarmItem(
                     
                     Surface(
                         onClick = {
-                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound")
-                                alarm.soundUri?.let { uri ->
-                                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(uri))
+                            if (isEditable) {
+                                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound")
+                                    alarm.soundUri?.let { uri ->
+                                        putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(uri))
+                                    }
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
                                 }
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                                soundPickerLauncher.launch(intent)
                             }
-                            soundPickerLauncher.launch(intent)
                         },
                         shape = RoundedCornerShape(8.dp),
                         color = Color.Transparent,
@@ -1356,7 +1359,7 @@ fun AlarmItem(
                     }
                     
                     // Clone button
-                    IconButton(onClick = onClone) {
+                    IconButton(onClick = onClone, enabled = isEditable) {
                         Icon(
                             Icons.Outlined.ContentCopy,
                             contentDescription = "Clone",
@@ -1366,7 +1369,7 @@ fun AlarmItem(
                     }
                     
                     // Delete button
-                    IconButton(onClick = onDelete) {
+                    IconButton(onClick = onDelete, enabled = isEditable) {
                         Icon(
                             Icons.Outlined.Delete,
                             contentDescription = "Delete",
@@ -1391,7 +1394,7 @@ fun AlarmItem(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { showTimePicker = true }
+                            .clickable(enabled = isEditable) { showTimePicker = true }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Icon(
@@ -1470,7 +1473,7 @@ fun AlarmItem(
                             style = MaterialTheme.typography.displayMedium.copy(fontSize = 40.sp),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.clickable { showTimePicker = true }
+                            modifier = Modifier.clickable(enabled = isEditable) { showTimePicker = true }
                         )
                         
                         // Reset button (inside circle, bottom) - always visible
