@@ -52,55 +52,15 @@ class AlarmRingingActivity : ComponentActivity() {
         val serviceIntent = Intent(this, AlarmService::class.java)
         stopService(serviceIntent)
         
-        // Check if we're in a chain and need to start the next alarm
-        val chainManager = ChainManager(this)
-        if (chainManager.isChainActive()) {
-            val alarmRepository = AlarmRepository(this)
-            val alarms = alarmRepository.loadAlarms()
-            
-            chainManager.moveToNextAlarm()
-            val nextIndex = chainManager.getCurrentIndex()
-            
-            if (nextIndex < alarms.size) {
-                val nextAlarm = alarms[nextIndex]
-                val delayMillis = nextAlarm.getTotalSeconds() * 1000L
-                val endTime = System.currentTimeMillis() + delayMillis
-                
-                // Start ChainService for next alarm
-                val chainIntent = Intent(this, ChainService::class.java).apply {
-                    action = ChainService.ACTION_START_CHAIN_ALARM
-                    putExtra(ChainService.EXTRA_END_TIME, endTime)
-                    putExtra(ChainService.EXTRA_CURRENT_INDEX, nextIndex)
-                    putExtra(ChainService.EXTRA_TOTAL_ALARMS, alarms.size)
-                    putExtra(ChainService.EXTRA_ALARM_NAME, nextAlarm.name)
-                }
-                
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(chainIntent)
-                } else {
-                    startService(chainIntent)
-                }
-                
-                val updatedAlarms = alarms.toMutableList()
-                updatedAlarms[nextIndex] = nextAlarm.copy(
-                    isActive = true,
-                    scheduledTime = endTime
-                )
-                alarmRepository.saveAlarms(updatedAlarms)
-            } else {
-                // Chain finished
-                chainManager.stopChain()
-                val stopChainIntent = Intent(this, ChainService::class.java).apply {
-                    action = ChainService.ACTION_STOP_CHAIN
-                }
-                startService(stopChainIntent)
-            }
+        // DELEGATE NEXT STEP TO CHAIN SERVICE
+        // ChainService will check isChainSequence() and stop if false.
+        val nextIntent = Intent(this, ChainService::class.java).apply {
+            action = ChainService.ACTION_NEXT_ALARM
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(nextIntent)
         } else {
-            // Not a chain, ensure ChainService is stopped just in case
-             val stopChainIntent = Intent(this, ChainService::class.java).apply {
-                action = ChainService.ACTION_STOP_CHAIN
-            }
-            startService(stopChainIntent)
+            startService(nextIntent)
         }
         
         finish()

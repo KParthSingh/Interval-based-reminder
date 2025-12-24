@@ -29,66 +29,21 @@ class AlarmStopReceiver : BroadcastReceiver() {
             notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
             notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
             
-            // Check if we're in a chain and need to start the next alarm
-            if (chainManager.isChainActive()) {
-                val alarmRepository = AlarmRepository(context)
-                val alarms = alarmRepository.loadAlarms()
-                
-                // Move to next alarm
-                chainManager.moveToNextAlarm()
-                val nextIndex = chainManager.getCurrentIndex()
-                DebugLogger.info("AlarmStopReceiver", "Moving to next alarm in chain: index=$nextIndex, total=${alarms.size}")
-                
-                if (nextIndex < alarms.size) {
-                    // Start the next alarm in the chain
-                    val nextAlarm = alarms[nextIndex]
-                    val delayMillis = nextAlarm.getTotalSeconds() * 1000L
-                    val endTime = System.currentTimeMillis() + delayMillis
-                    
-                    val alarmScheduler = AlarmScheduler(context)
-                    alarmScheduler.scheduleAlarm(delayMillis, nextIndex + 1)
-                    
-                    // Start ChainService for next alarm
-                    val chainIntent = Intent(context, ChainService::class.java).apply {
-                        action = ChainService.ACTION_START_CHAIN_ALARM
-                        putExtra(ChainService.EXTRA_END_TIME, endTime)
-                        putExtra(ChainService.EXTRA_CURRENT_INDEX, nextIndex)
-                        putExtra(ChainService.EXTRA_TOTAL_ALARMS, alarms.size)
-                        putExtra(ChainService.EXTRA_ALARM_NAME, nextAlarm.name)
-                    }
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        context.startForegroundService(chainIntent)
-                    } else {
-                        context.startService(chainIntent)
-                    }
-                    
-                    // Update alarm state in repository
-                    val updatedAlarms = alarms.toMutableList()
-                    updatedAlarms[nextIndex] = nextAlarm.copy(
-                        isActive = true,
-                        scheduledTime = endTime
-                    )
-                    alarmRepository.saveAlarms(updatedAlarms)
-                } else {
-                    // Chain complete - stop everything
-                    DebugLogger.info("AlarmStopReceiver", "Chain complete - all alarms finished")
-                    chainManager.stopChain()
-                    
-                    // Stop ChainService to remove notification
-                    val stopChainIntent = Intent(context, ChainService::class.java).apply {
-                        action = ChainService.ACTION_STOP_CHAIN
-                    }
-                    context.startService(stopChainIntent)
-                    
-                    // Clear all active alarms in the repository
-                    val clearedAlarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
-                    alarmRepository.saveAlarms(clearedAlarms)
-                    
-                    Log.d("AlarmStopReceiver", "Chain completed - all alarms finished")
-                }
+            // DELEGATE NEXT STEP TO CHAIN SERVICE
+            // ChainService.handleNextAlarm() will check isChainSequence() and decide 
+            // whether to stop (Single Mode) or advance (Chain Mode).
+            DebugLogger.info("AlarmStopReceiver", "Delegating next step to ChainService")
+            val nextIntent = Intent(context, ChainService::class.java).apply {
+                action = ChainService.ACTION_NEXT_ALARM
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                 context.startForegroundService(nextIntent)
+            } else {
+                 context.startService(nextIntent)
             }
             
-            Log.d("AlarmStopReceiver", "Alarm stopped and notification dismissed")
+            Log.d("AlarmStopReceiver", "Alarm stopped and ACTION_NEXT_ALARM sent")
         }
     }
 }
+

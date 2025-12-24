@@ -19,6 +19,18 @@ class ChainManager(private val context: Context) {
         private const val KEY_SERVICE_END_TIME = "service_end_time"
         private const val KEY_SERVICE_TOTAL_ALARMS = "service_total_alarms"
         private const val KEY_SERVICE_ALARM_NAME = "service_alarm_name"
+        private const val KEY_IS_CHAIN_SEQUENCE = "is_chain_sequence"
+    }
+    
+    fun setChainSequence(isChain: Boolean) {
+        prefs.edit()
+            .putBoolean(KEY_IS_CHAIN_SEQUENCE, isChain)
+            .apply()
+    }
+
+    fun isChainSequence(): Boolean {
+        // Default to true (chain mode) if not specified, to match legacy behavior
+        return prefs.getBoolean(KEY_IS_CHAIN_SEQUENCE, true)
     }
     
     fun startChain() {

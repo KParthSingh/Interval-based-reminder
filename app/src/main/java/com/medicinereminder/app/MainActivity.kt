@@ -169,8 +169,8 @@ class MainActivity : ComponentActivity() {
                             )
                         } else {
                             MainScreen(
-                                onScheduleAlarm = { delayMillis, requestCode, name, current, total ->
-                                    scheduleAlarm(delayMillis, requestCode, name, current, total)
+                                onScheduleAlarm = { delayMillis, requestCode, name, current, total, isChain ->
+                                    scheduleAlarm(delayMillis, requestCode, name, current, total, isChain)
                                 },
                                 onOpenSettings = { showSettings = true }
                             )
@@ -240,7 +240,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun scheduleAlarm(delayMillis: Long, requestCode: Int, name: String, currentIndex: Int, totalAlarms: Int) {
+    private fun scheduleAlarm(delayMillis: Long, requestCode: Int, name: String, currentIndex: Int, totalAlarms: Int, isChain: Boolean) {
         alarmScheduler.scheduleAlarm(delayMillis, requestCode)
         
         val chainIntent = Intent(this, ChainService::class.java).apply {
@@ -249,6 +249,7 @@ class MainActivity : ComponentActivity() {
             putExtra(ChainService.EXTRA_CURRENT_INDEX, currentIndex)
             putExtra(ChainService.EXTRA_TOTAL_ALARMS, totalAlarms)
             putExtra(ChainService.EXTRA_ALARM_NAME, name)
+            putExtra(ChainService.EXTRA_IS_CHAIN, isChain)
         }
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -265,7 +266,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(
-    onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit,
+    onScheduleAlarm: (Long, Int, String, Int, Int, Boolean) -> Unit,
     onOpenSettings: () -> Unit
 ) {
     val context = LocalContext.current
@@ -277,6 +278,7 @@ fun MainScreen(
     var isPaused by remember { mutableStateOf(chainManager.isChainPaused()) }
     var currentChainIndex by remember { mutableIntStateOf(chainManager.getCurrentIndex()) }
     var isAlarmRinging by remember { mutableStateOf(false) }
+    var isChainSequence by remember { mutableStateOf(true) } // Default to true
 
     // Sync State Loop
     var logCounter by remember { mutableIntStateOf(0) }
@@ -286,6 +288,7 @@ fun MainScreen(
             isChainActive = chainManager.isChainActive()
             isPaused = chainManager.isChainPaused()
             currentChainIndex = chainManager.getCurrentIndex()
+            isChainSequence = chainManager.isChainSequence()
             
             // Check if alarm is ringing from ChainManager state
             isAlarmRinging = chainManager.isAlarmRinging()
@@ -298,6 +301,7 @@ fun MainScreen(
                     "isPaused" to isPaused,
                     "currentChainIndex" to currentChainIndex,
                     "isAlarmRinging" to isAlarmRinging,
+                    "isChainSequence" to isChainSequence,
                     "totalAlarms" to alarms.size
                 ))
             }
@@ -359,6 +363,7 @@ fun MainScreen(
                         currentIndex = currentChainIndex,
                         totalAlarms = alarms.size,
                         isAlarmRinging = isAlarmRinging,
+                        isChainSequence = isChainSequence,
                         alarms = alarms,
                         onPause = {
                             android.util.Log.d("MainActivity", "PAUSE button clicked! Sending ACTION_PAUSE_CHAIN intent")
@@ -427,7 +432,7 @@ fun MainScreen(
                             chainManager.startChain()
                             val firstAlarm = alarms[0]
                             val delay = firstAlarm.getTotalSeconds() * 1000L
-                            onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size)
+                            onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size, true)
                             alarms = alarms.toMutableList().apply {
                                 set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
                             }
@@ -649,7 +654,7 @@ fun MainScreen(
                                     alarms = alarms.toMutableList().apply { set(index, updated) }
                                 },
                                 onSchedule = { delay ->
-                                    onScheduleAlarm(delay, index + 1, alarm.name, index, 1) 
+                                    onScheduleAlarm(delay, index + 1, alarm.name, index, 1, false) 
                                     alarms = alarms.toMutableList().apply {
                                         set(index, alarm.copy(
                                             isActive = true,
@@ -870,6 +875,7 @@ fun StickyChainBar(
     currentIndex: Int,
     totalAlarms: Int,
     isAlarmRinging: Boolean,
+    isChainSequence: Boolean = true,
     alarms: List<Alarm>,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -971,8 +977,9 @@ fun StickyChainBar(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         if (isAlarmRinging) "🔔 ALARM RINGING" 
-                        else if (isPaused) "SEQUENCE PAUSED" 
-                        else stringResource(R.string.chain_active_title),
+                        else if (isPaused) if (isChainSequence) "SEQUENCE PAUSED" else "ALARM PAUSED"
+                        else if (isChainSequence) stringResource(R.string.chain_active_title)
+                        else "ALARM RUNNING",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (isAlarmRinging) MaterialTheme.colorScheme.error
@@ -980,7 +987,8 @@ fun StickyChainBar(
                                else MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        stringResource(R.string.chain_info_format, currentIndex + 1, totalAlarms),
+                        if (isChainSequence) stringResource(R.string.chain_info_format, currentIndex + 1, totalAlarms)
+                        else alarms.getOrNull(currentIndex)?.name ?: "Alarm",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -1018,9 +1026,10 @@ fun StickyChainBar(
             
             val remainingSeconds = (remainingTimeMs / 1000).toInt().coerceAtLeast(0)
             
-            // Navigation buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
+            // Navigation buttons (only for sequence)
+            if (isChainSequence) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
@@ -1051,19 +1060,23 @@ fun StickyChainBar(
                     )
                 }
             }
+            }
             
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
                     if (isPaused) "Resumes in: ${formatTime(remainingSeconds)}" 
-                    else "Next alarm: ${formatTime(remainingSeconds)}",
+                    else if (isChainSequence) "Next alarm: ${formatTime(remainingSeconds)}"
+                    else "Time remaining: ${formatTime(remainingSeconds)}",
                     style = MaterialTheme.typography.titleMedium,
                     color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                 )
 
                 // Calculate when the last alarm will trigger
-                val totalRemainingTimeMs = if (currentIndex < alarms.size) {
+                val totalRemainingTimeMs = if (!isChainSequence) {
+                    remainingTimeMs
+                } else if (currentIndex < alarms.size) {
                     // Sum up remaining time for current alarm plus all future alarms
                     remainingTimeMs + alarms.subList(currentIndex + 1, alarms.size).sumOf { it.getTotalSeconds() * 1000L }
                 } else {
@@ -1074,7 +1087,7 @@ fun StickyChainBar(
                 val formattedTime = timeFormat.format(Date(lastAlarmTime))
                 
                 Text(
-                    "Last alarm: $formattedTime",
+                    "Ends at: $formattedTime",
                     style = MaterialTheme.typography.titleMedium
                 )
             }

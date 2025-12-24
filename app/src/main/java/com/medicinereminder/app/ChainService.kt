@@ -131,15 +131,17 @@ class ChainService : Service() {
         return true // Show notification
     }
     
-    // Build and post notification
+    // Updated showNotification to use isChainSequence
     private fun showNotification(isPaused: Boolean = false) {
+        val isChain = ChainManager(this).isChainSequence()
         val notification = NotificationHelper.buildChainNotification(
             this,
             currentIndex + 1,
             totalAlarms,
             endTime, // Pass endTime for Chronometer
             currentAlarmName,
-            isPaused
+            isPaused,
+            isChain // PASS FLAG
         )
         
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -288,54 +290,59 @@ class ChainService : Service() {
                 currentIndex = intent.getIntExtra(EXTRA_CURRENT_INDEX, 0)
                 totalAlarms = intent.getIntExtra(EXTRA_TOTAL_ALARMS, 0)
                 currentAlarmName = intent.getStringExtra(EXTRA_ALARM_NAME) ?: ""
-                DebugLogger.info("ChainService", "START_CHAIN_ALARM: index=$currentIndex/$totalAlarms, endTime=$endTime")
+                
+                // CRITICAL: Read Chain Mode flag
+                val isChain = intent.getBooleanExtra(EXTRA_IS_CHAIN, true)
+                ChainManager(this).setChainSequence(isChain)
+                
+                DebugLogger.info("ChainService", "START_CHAIN_ALARM: index=$currentIndex, isChain=$isChain")
                 Log.d("ChainService", "Starting countdown for alarm $currentIndex/$totalAlarms, ends at $endTime")
                 startCountdown()
             }
             ACTION_STOP_CHAIN -> {
-                DebugLogger.warn("ChainService", "STOP_CHAIN requested")
-                Log.d("ChainService", ">>> ACTION_STOP_CHAIN received")
-                Log.d("ChainService", "Before stop - ChainActive: ${ChainManager(this).isChainActive()}")
-                
-                // CRITICAL FIX: Cancel ALL possible scheduled alarms defensively
-                val alarmScheduler = AlarmScheduler(this)
-                val repository = AlarmRepository(this)
-                val alarms = repository.loadAlarms()
-                
-                // Cancel alarm for current index
-                val currentIdx = ChainManager(this).getCurrentIndex()
-                val requestCode = currentIdx + 1
-                Log.d("ChainService", "Canceling current alarm with requestCode: $requestCode")
-                alarmScheduler.cancelAlarm(requestCode)
-                
-                // DEFENSIVE: Cancel all possible alarm codes (in case of desync)
-                for (i in 0 until alarms.size) {
-                    alarmScheduler.cancelAlarm(i + 1)
-                }
-                DebugLogger.info("ChainService", "Canceled all ${alarms.size} possible alarm codes defensively")
-                
-                ChainManager(this).stopChain()
-                
-                // Clear all active alarms in the repository (reuse repository and alarms from above)
-                val clearedAlarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
-                repository.saveAlarms(clearedAlarms)
-                Log.d("ChainService", "All alarms cleared")
-                
-                Log.d("ChainService", "After stop - ChainActive: ${ChainManager(this).isChainActive()}")
-                
-                // Also ensure any ringing alarm service is stopped directly
-                val stopAlarmIntent = Intent(this, AlarmService::class.java)
-                stopService(stopAlarmIntent)
-                Log.d("ChainService", "AlarmService stop requested")
-                
-                // Dismiss both notification IDs for safety
-                val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-                notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
-                notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
-                Log.d("ChainService", "Notifications canceled")
-                
-                Log.d("ChainService", "Calling stopSelf()...")
-                stopSelf()
+                 DebugLogger.warn("ChainService", "STOP_CHAIN requested")
+                 Log.d("ChainService", ">>> ACTION_STOP_CHAIN received")
+                 Log.d("ChainService", "Before stop - ChainActive: ${ChainManager(this).isChainActive()}")
+                 
+                 // CRITICAL FIX: Cancel ALL possible scheduled alarms defensively
+                 val alarmScheduler = AlarmScheduler(this)
+                 val repository = AlarmRepository(this)
+                 val alarms = repository.loadAlarms()
+                 
+                 // Cancel alarm for current index
+                 val currentIdx = ChainManager(this).getCurrentIndex()
+                 val requestCode = currentIdx + 1
+                 Log.d("ChainService", "Canceling current alarm with requestCode: $requestCode")
+                 alarmScheduler.cancelAlarm(requestCode)
+                 
+                 // DEFENSIVE: Cancel all possible alarm codes (in case of desync)
+                 for (i in 0 until alarms.size) {
+                     alarmScheduler.cancelAlarm(i + 1)
+                 }
+                 DebugLogger.info("ChainService", "Canceled all ${alarms.size} possible alarm codes defensively")
+                 
+                 ChainManager(this).stopChain()
+                 
+                 // Clear all active alarms in the repository (reuse repository and alarms from above)
+                 val clearedAlarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
+                 repository.saveAlarms(clearedAlarms)
+                 Log.d("ChainService", "All alarms cleared")
+                 
+                 Log.d("ChainService", "After stop - ChainActive: ${ChainManager(this).isChainActive()}")
+                 
+                 // Also ensure any ringing alarm service is stopped directly
+                 val stopAlarmIntent = Intent(this, AlarmService::class.java)
+                 stopService(stopAlarmIntent)
+                 Log.d("ChainService", "AlarmService stop requested")
+                 
+                 // Dismiss both notification IDs for safety
+                 val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                 notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
+                 notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
+                 Log.d("ChainService", "Notifications canceled")
+                 
+                 Log.d("ChainService", "Calling stopSelf()...")
+                 stopSelf()
             }
             ACTION_PAUSE_CHAIN -> {
                 Log.d("ChainService", ">>> ACTION_PAUSE_CHAIN received")
@@ -520,6 +527,17 @@ class ChainService : Service() {
         // Cancel scheduled alarm
         val alarmScheduler = AlarmScheduler(this)
         alarmScheduler.cancelAlarm(currentIndex + 1)
+        
+        // CHECK CHAIN MODE
+        val isChain = ChainManager(this).isChainSequence()
+        if (!isChain) {
+            Log.d("ChainService", "Single Alarm Mode - Stopping service after alarm")
+            val stopIntent = Intent(this, ChainService::class.java).apply {
+                action = ACTION_STOP_CHAIN
+            }
+            startService(stopIntent)
+            return
+        }
         
         // Get alarm repository
         val repository = AlarmRepository(this)

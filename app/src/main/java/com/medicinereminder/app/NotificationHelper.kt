@@ -22,7 +22,8 @@ object NotificationHelper {
         totalSteps: Int,
         endTime: Long,
         nextAlarmName: String,
-        isPaused: Boolean = false
+        isPaused: Boolean = false,
+        isChainSequence: Boolean = true // Default to true
     ): android.app.Notification {
         // Countdown notification
         val stopIntent = Intent(context, ChainService::class.java).apply {
@@ -75,8 +76,18 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = "Sequence: $currentStep of $totalSteps ${if(isPaused) "(PAUSED)" else ""}"
-        val content = if (isPaused) "Tap RESUME to continue." else "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"}"
+        // Title and Content customization based on Chain Mode
+        val title = if (isChainSequence) {
+            "Sequence: $currentStep of $totalSteps ${if(isPaused) "(PAUSED)" else ""}"
+        } else {
+             "Alarm Running ${if(isPaused) "(PAUSED)" else ""}"
+        }
+        
+        val content = if (isPaused) {
+            "Tap RESUME to continue."
+        } else {
+            if (isChainSequence) "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"}" else "Time remaining..."
+        }
 
         // Get settings repository for notification configuration
         val settingsRepository = SettingsRepository(context)
@@ -99,8 +110,8 @@ object NotificationHelper {
                    .setChronometerCountDown(true)
         }
         
-        // Add navigation buttons (Previous)
-        if (currentStep > 1) {
+        // Add navigation buttons (Previous) - ONLY IF CHAIN
+        if (isChainSequence && currentStep > 1) {
             builder.addAction(
                 android.R.drawable.ic_media_previous,
                 "PREV",
@@ -122,8 +133,8 @@ object NotificationHelper {
             )
         }
         
-        // Add navigation buttons (Next)
-        if (currentStep < totalSteps) {
+        // Add navigation buttons (Next) - ONLY IF CHAIN
+        if (isChainSequence && currentStep < totalSteps) {
             builder.addAction(
                 android.R.drawable.ic_media_next,
                 "NEXT",
@@ -135,7 +146,7 @@ object NotificationHelper {
         if (!settingsRepository.getHideStopButton()) {
             builder.addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "STOP SEQUENCE",
+                if (isChainSequence) "STOP SEQUENCE" else "STOP ALARM",
                 stopPendingIntent
             )
         }
