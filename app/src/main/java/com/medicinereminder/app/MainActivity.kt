@@ -19,6 +19,13 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -111,17 +118,63 @@ class MainActivity : ComponentActivity() {
                         androidx.activity.compose.BackHandler {
                             showSettings = false
                         }
-                        SettingsScreen(
-                            onNavigateBack = { showSettings = false },
-                            onThemeChanged = { themeMode = settingsRepository.getThemeMode() }
-                        )
-                    } else {
-                        MainScreen(
-                            onScheduleAlarm = { delayMillis, requestCode, name, current, total ->
-                                scheduleAlarm(delayMillis, requestCode, name, current, total)
-                            },
-                            onOpenSettings = { showSettings = true }
-                        )
+                    }
+                    
+                    // Animated transition between screens
+                    AnimatedContent(
+                        targetState = showSettings,
+                        transitionSpec = {
+                            // Define the slide + fade transition
+                            val slideOffset = 1000 // pixels to slide from
+                            val duration = 400 // duration in milliseconds
+                            
+                            if (targetState) {
+                                // Going to Settings: slide in from right + fade in
+                                (slideInHorizontally(
+                                    initialOffsetX = { slideOffset },
+                                    animationSpec = tween(duration)
+                                ) + fadeIn(
+                                    animationSpec = tween(duration)
+                                )).togetherWith(
+                                    slideOutHorizontally(
+                                        targetOffsetX = { -slideOffset },
+                                        animationSpec = tween(duration)
+                                    ) + fadeOut(
+                                        animationSpec = tween(duration)
+                                    )
+                                )
+                            } else {
+                                // Going back to Main: slide in from left + fade in
+                                (slideInHorizontally(
+                                    initialOffsetX = { -slideOffset },
+                                    animationSpec = tween(duration)
+                                ) + fadeIn(
+                                    animationSpec = tween(duration)
+                                )).togetherWith(
+                                    slideOutHorizontally(
+                                        targetOffsetX = { slideOffset },
+                                        animationSpec = tween(duration)
+                                    ) + fadeOut(
+                                        animationSpec = tween(duration)
+                                    )
+                                )
+                            }
+                        },
+                        label = "screen_transition"
+                    ) { isSettings ->
+                        if (isSettings) {
+                            SettingsScreen(
+                                onNavigateBack = { showSettings = false },
+                                onThemeChanged = { themeMode = settingsRepository.getThemeMode() }
+                            )
+                        } else {
+                            MainScreen(
+                                onScheduleAlarm = { delayMillis, requestCode, name, current, total ->
+                                    scheduleAlarm(delayMillis, requestCode, name, current, total)
+                                },
+                                onOpenSettings = { showSettings = true }
+                            )
+                        }
                     }
                 }
             }
