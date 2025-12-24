@@ -1257,168 +1257,45 @@ fun AlarmItem(
                 // ===== EXPANDED LAYOUT (ACTIVE STATE) =====
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Central circle section
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    com.medicinereminder.app.ui.CircleButtonsLayout(
-                        modifier = Modifier
-                            .fillMaxWidth(0.5f) // Make circle 50% of card width
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            // Progress circle
-                            com.medicinereminder.app.ui.TimerCircleView(
-                                progress = displayProgress,
-                                isExpired = alarm.state == AlarmState.EXPIRED,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            
-                            // Time display in center
-                            Text(
-                                text = if (alarm.state == AlarmState.RUNNING || alarm.state == AlarmState.PAUSED) {
-                                    formatTime(remainingTime)
-                                } else {
-                                    alarm.getFormattedTime()
-                                },
-                                style = MaterialTheme.typography.headlineLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (alarm.state == AlarmState.PAUSED) 
-                                    MaterialTheme.colorScheme.error 
-                                else 
-                                    MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.clickable { showTimePicker = true }
-                            )
-                            
-                            // Reset button (only visible when paused or running)
-                            if (alarm.state == AlarmState.PAUSED || alarm.state == AlarmState.RUNNING) {
-                                IconButton(
-                                    onClick = {
-                                        // Stop the alarm and reset to initial state
-                                        val repository = AlarmRepository(context)
-                                        val allAlarms = repository.loadAlarms()
-                                        val alarmIndex = allAlarms.indexOf(alarm)
-                                        val requestCode = alarmIndex + 1
-                                        
-                                        val alarmScheduler = AlarmScheduler(context)
-                                        alarmScheduler.cancelAlarm(requestCode)
-                                        
-                                        val stopIntent = Intent(context, ChainService::class.java).apply {
-                                            action = ChainService.ACTION_STOP_CHAIN
-                                        }
-                                        context.startService(stopIntent)
-                                        
-                                        onUpdate(alarm.copy(
-                                            isActive = false,
-                                            scheduledTime = 0L,
-                                            state = AlarmState.RESET,
-                                            totalDuration = 0L,
-                                            startTime = 0L
-                                        ))
-                                    },
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(bottom = 8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = "Reset",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                            }
-            }
-            
-            // Footer controls only shown when expanded (active state)
-            if (isExpanded) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // ===== FOOTER CONTROLS SECTION =====
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    // Add time button (only visible when running)
-                    if (alarm.state == AlarmState.RUNNING) {
-                        TextButton(
-                            onClick = {
-                                // Add 1 minute to remaining time by extending scheduled time
-                                val repository = AlarmRepository(context)
-                                val allAlarms = repository.loadAlarms()
-                                val alarmIndex = allAlarms.indexOf(alarm)
-                                val requestCode = alarmIndex + 1
-                                
-                                // Cancel existing alarm
-                                val alarmScheduler = AlarmScheduler(context)
-                                alarmScheduler.cancelAlarm(requestCode)
-                                
-                                // Calculate new end time (add 60 seconds)
-                                val newScheduledTime = alarm.scheduledTime + 60000
-                                val newTotalDuration = alarm.totalDuration + 60000
-                                
-                                // Reschedule with new time
-                                val delay = newScheduledTime - System.currentTimeMillis()
-                                onSchedule(delay)
-                                
-                                // Update alarm with extended time
-                                val newTotalSeconds = alarm.getTotalSeconds() + 60
-                                val h = newTotalSeconds / 3600
-                                val m = (newTotalSeconds % 3600) / 60
-                                val s = newTotalSeconds % 60
-                                onUpdate(alarm.copy(
-                                    hours = h,
-                                    minutes = m,
-                                    seconds = s,
-                                    scheduledTime = newScheduledTime,
-                                    totalDuration = newTotalDuration
-                                ))
-                            }
-                        ) {
-                            Text("+ 1:00", style = MaterialTheme.typography.labelMedium)
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.width(60.dp))
-                    }
-                    
-                    // Main play/pause/stop button
-                    Button(
-                        onClick = {
-                            when (alarm.state) {
-                                AlarmState.RESET, AlarmState.PAUSED -> {
-                                    // Start or resume
-                                    val delay = alarm.getTotalSeconds() * 1000L
-                                    val now = System.currentTimeMillis()
-                                    onSchedule(delay)
-                                    onUpdate(alarm.copy(
-                                        isActive = true,
-                                        scheduledTime = now + delay,
-                                        state = AlarmState.RUNNING,
-                                        totalDuration = delay,
-                                        startTime = now
-                                    ))
-                                }
-                                AlarmState.RUNNING -> {
-                                    // Pause
-                                    val repository = AlarmRepository(context)
-                                    val allAlarms = repository.loadAlarms()
-                                    val alarmIndex = allAlarms.indexOf(alarm)
-                                    val requestCode = alarmIndex + 1
-                                    
-                                    val alarmScheduler = AlarmScheduler(context)
-                                    alarmScheduler.cancelAlarm(requestCode)
-                                    
-                                    onUpdate(alarm.copy(
-                                        isActive = false,
-                                        state = AlarmState.PAUSED
-                                    ))
-                                }
-                                AlarmState.EXPIRED -> {
-                                    // Stop
+                    // LEFT: Progress Circle (Dominates space)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(top = 5.dp, end = 16.dp, bottom = 12.dp)
+                            .heightIn(max = 240.dp)
+                            .aspectRatio(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Progress circle
+                        com.medicinereminder.app.ui.TimerCircleView(
+                            progress = displayProgress,
+                            isExpired = alarm.state == AlarmState.EXPIRED,
+                            modifier = Modifier.fillMaxSize().padding(4.dp)
+                        )
+                        
+                        // Time display in center
+                        Text(
+                            text = if (alarm.state == AlarmState.RUNNING || alarm.state == AlarmState.PAUSED) {
+                                formatTime(remainingTime)
+                            } else {
+                                alarm.getFormattedTime()
+                            },
+                            style = MaterialTheme.typography.displayMedium.copy(fontSize = 40.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.clickable { showTimePicker = true }
+                        )
+                        
+                        // Reset button (inside circle, bottom)
+                        if (alarm.state == AlarmState.PAUSED) {
+                            IconButton(
+                                onClick = {
+                                    // Stop the alarm and reset
                                     val stopIntent = Intent(context, ChainService::class.java).apply {
                                         action = ChainService.ACTION_STOP_CHAIN
                                     }
@@ -1431,43 +1308,129 @@ fun AlarmItem(
                                         totalDuration = 0L,
                                         startTime = 0L
                                     ))
-                                }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 16.dp)
+                                    .size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Refresh,
+                                    contentDescription = "Reset",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
-                        },
-                        enabled = alarm.getTotalSeconds() > 0,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = when (alarm.state) {
-                                AlarmState.EXPIRED -> MaterialTheme.colorScheme.error
-                                else -> MaterialTheme.colorScheme.primary
-                            }
-                        ),
-                        modifier = Modifier.height(44.dp)
+                        }
+                    }
+
+                    // RIGHT: Controls Stack
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Bottom,
+                        modifier = Modifier.fillMaxHeight().padding(bottom = 12.dp)
                     ) {
-                        Icon(
-                            imageVector = when (alarm.state) {
-                                AlarmState.RESET, AlarmState.PAUSED -> Icons.Outlined.PlayArrow
-                                AlarmState.RUNNING -> Icons.Outlined.Pause
-                                AlarmState.EXPIRED -> Icons.Outlined.Stop
-                            },
-                            contentDescription = when (alarm.state) {
-                                AlarmState.RESET, AlarmState.PAUSED -> "Play"
-                                AlarmState.RUNNING -> "Pause"
-                                AlarmState.EXPIRED -> "Stop"
-                            },
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            when (alarm.state) {
-                                AlarmState.RESET -> "START"
-                                AlarmState.PAUSED -> "RESUME"
-                                AlarmState.RUNNING -> "PAUSE"
-                                AlarmState.EXPIRED -> "STOP"
+                        // +1:00 Button (Only when running)
+                        if (alarm.state == AlarmState.RUNNING) {
+                            TextButton(
+                                onClick = {
+                                    // Add 1 minute code
+                                    val repository = AlarmRepository(context)
+                                    val allAlarms = repository.loadAlarms()
+                                    val alarmIndex = allAlarms.indexOf(alarm)
+                                    val requestCode = alarmIndex + 1
+                                    
+                                    val alarmScheduler = AlarmScheduler(context)
+                                    alarmScheduler.cancelAlarm(requestCode)
+                                    
+                                    val newScheduledTime = alarm.scheduledTime + 60000
+                                    val newTotalDuration = alarm.totalDuration + 60000
+                                    
+                                    val delay = newScheduledTime - System.currentTimeMillis()
+                                    onSchedule(delay)
+                                    
+                                    val newTotalSeconds = alarm.getTotalSeconds() + 60
+                                    val h = newTotalSeconds / 3600
+                                    val m = (newTotalSeconds % 3600) / 60
+                                    val s = newTotalSeconds % 60
+                                    onUpdate(alarm.copy(
+                                        hours = h,
+                                        minutes = m,
+                                        seconds = s,
+                                        scheduledTime = newScheduledTime,
+                                        totalDuration = newTotalDuration
+                                    ))
+                                },
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                Text("+ 1:00", style = MaterialTheme.typography.titleMedium)
                             }
-                        )
+                        }
+
+                        // Play/Pause/Stop Button (Icon only)
+                        Button(
+                            onClick = {
+                                when (alarm.state) {
+                                    AlarmState.RESET, AlarmState.PAUSED -> {
+                                        val delay = alarm.getTotalSeconds() * 1000L
+                                        val now = System.currentTimeMillis()
+                                        onSchedule(delay)
+                                        onUpdate(alarm.copy(
+                                            isActive = true,
+                                            scheduledTime = now + delay,
+                                            state = AlarmState.RUNNING,
+                                            totalDuration = delay,
+                                            startTime = now
+                                        ))
+                                    }
+                                    AlarmState.RUNNING -> {
+                                        val repository = AlarmRepository(context)
+                                        val allAlarms = repository.loadAlarms()
+                                        val alarmIndex = allAlarms.indexOf(alarm)
+                                        val requestCode = alarmIndex + 1
+                                        
+                                        val alarmScheduler = AlarmScheduler(context)
+                                        alarmScheduler.cancelAlarm(requestCode)
+                                        
+                                        onUpdate(alarm.copy(
+                                            isActive = false,
+                                            state = AlarmState.PAUSED
+                                        ))
+                                    }
+                                    AlarmState.EXPIRED -> {
+                                        val stopIntent = Intent(context, ChainService::class.java).apply {
+                                            action = ChainService.ACTION_STOP_CHAIN
+                                        }
+                                        context.startService(stopIntent)
+                                        
+                                        onUpdate(alarm.copy(
+                                            isActive = false,
+                                            scheduledTime = 0L,
+                                            state = AlarmState.RESET,
+                                            totalDuration = 0L,
+                                            startTime = 0L
+                                        ))
+                                    }
+                                }
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            contentPadding = PaddingValues(24.dp),
+                            modifier = Modifier.size(80.dp) // Square-ish large touch area
+                        ) {
+                            Icon(
+                                imageVector = when (alarm.state) {
+                                    AlarmState.RESET, AlarmState.PAUSED -> Icons.Outlined.PlayArrow
+                                    AlarmState.RUNNING -> Icons.Outlined.Pause
+                                    AlarmState.EXPIRED -> Icons.Outlined.Stop
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
             }
+            
+
         }
     }
     
