@@ -653,7 +653,8 @@ fun MainScreen(
                                 },
                                 onClone = {
                                     alarms = alarms.toMutableList().apply { add(index + 1, alarm.clone()) }
-                                }
+                                },
+                                chainState = chainState
                             )
                         }
                     }
@@ -688,7 +689,8 @@ fun MainScreen(
                                 scaleX = 1.05f
                                 scaleY = 1.05f
                                 shadowElevation = 8.dp.toPx()
-                            }
+                            },
+                        chainState = chainState
                     )
                 }
             }
@@ -1092,7 +1094,8 @@ fun AlarmItem(
     onDelete: () -> Unit,
     isEditable: Boolean = true,
     modifier: Modifier = Modifier,
-    onClone: () -> Unit
+    onClone: () -> Unit,
+    chainState: ChainState
 ) {
     val context = LocalContext.current
     var showNameDialog by remember { mutableStateOf(false) }
@@ -1120,48 +1123,51 @@ fun AlarmItem(
         }
     }
     
-    LaunchedEffect(index) { 
+    LaunchedEffect(chainState.isChainActive, chainState.currentIndex, chainState.isAlarmRinging, chainState.isPaused, chainState.endTime) { 
         val chainManager = ChainManager(context)
-        while (true) {
-            val activeAlarm = currentAlarm // Access latest state
-            val isChainActive = chainManager.isChainActive()
-            val chainIndex = chainManager.getCurrentIndex()
+        // Reactive Logic - Runs once on state change, NO LOOP, NO DELAY
+        val activeAlarm = alarm // Access latest state passed in parameter since we recompose on change
+        val isChainActive = chainState.isChainActive
+        val chainIndex = chainState.currentIndex
+        
+        // Allow synchronization if:
+        // 1. Chain is active AND this alarm is the one running
+        // 2. Chain is NOT active (Stop detected) AND this alarm thinks it's running
+        
+        val isRemoteActive = isChainActive && chainIndex == index
+        val isAlarmRinging = chainState.isAlarmRinging
+        
+        if (isRemoteActive) {
+            // Remote is Active
             
-            // Allow synchronization if:
-            // 1. Chain is active AND this alarm is the one running
-            // 2. Chain is NOT active (Stop detected) AND this alarm thinks it's running
-            
-            val isRemoteActive = isChainActive && chainIndex == index
-            val isAlarmRinging = chainManager.isAlarmRinging()
-            
-            if (isRemoteActive) {
-                // Remote is Active
-                
-                // CHECK IF RINGING FIRST
-                if (isAlarmRinging) {
-                    if (activeAlarm.state != AlarmState.EXPIRED) {
-                         Log.d("AlarmItem", "SYNC: Alarm RINGING detected -> Setting EXPIRED state")
-                         onUpdate(activeAlarm.copy(
-                             isActive = true,
-                             state = AlarmState.EXPIRED,
-                             scheduledTime = 0L // Done counting
-                         ))
-                    }
-                } else {
-                    // Not ringing, check Pause/Resume
-                    val isRemotePaused = chainManager.isChainPaused()
-                    
-                    if (isRemotePaused && activeAlarm.state != AlarmState.PAUSED) {
-                        val remaining = chainManager.getPausedRemainingTime()
-                        Log.d("AlarmItem", "SYNC: Notification PAUSE detected -> Pausing UI")
+            // CHECK IF RINGING FIRST
+            if (isAlarmRinging) {
+                if (activeAlarm.state != AlarmState.EXPIRED) {
+                        Log.d("AlarmItem", "SYNC: Alarm RINGING detected -> Setting EXPIRED state")
                         onUpdate(activeAlarm.copy(
-                            isActive = false, // Local convention for paused
-                            state = AlarmState.PAUSED,
-                            pausedRemainingMs = remaining
+                            isActive = true,
+                            state = AlarmState.EXPIRED,
+                            scheduledTime = 0L // Done counting
                         ))
-                    } else if (!isRemotePaused && activeAlarm.state != AlarmState.RUNNING) {
-                        val endTime = chainManager.getEndTime()
-                        Log.d("AlarmItem", "SYNC: Notification RESUME detected -> Resuming UI")
+                }
+            } else {
+                // Not ringing, check Pause/Resume
+                val isRemotePaused = chainState.isPaused
+                
+                if (isRemotePaused && activeAlarm.state != AlarmState.PAUSED) {
+                    val remaining = chainManager.getPausedRemainingTime()
+                    Log.d("AlarmItem", "SYNC: Notification PAUSE detected -> Pausing UI")
+                    onUpdate(activeAlarm.copy(
+                        isActive = false, // Local convention for paused
+                        state = AlarmState.PAUSED,
+                        pausedRemainingMs = remaining
+                    ))
+                } else if (!isRemotePaused && (activeAlarm.state != AlarmState.RUNNING || activeAlarm.scheduledTime != chainState.endTime)) {
+                    val endTime = chainState.endTime
+                    
+                    // Only sync if we have a valid end time (> 0) OR if we need to reset/correct
+                    if (endTime > 0 || activeAlarm.scheduledTime != 0L) {
+                        Log.d("AlarmItem", "SYNC: Notification RESUME/UPDATE detected -> Resuming UI with end=$endTime")
                         onUpdate(activeAlarm.copy(
                             isActive = true,
                             state = AlarmState.RUNNING,
@@ -1172,26 +1178,24 @@ fun AlarmItem(
                         ))
                     }
                 }
-            } else {
-                // Remote is NOT Active (STOPPED or different alarm)
-                // If local state is Running/Paused, we must Reset (Stop detected)
-                
-                // Grace period check
-                val timeSinceStart = System.currentTimeMillis() - localStartTime
-                val inGracePeriod = activeAlarm.isActive && timeSinceStart < 500 // Reduced grace period since Service is fixed
-                
-                if (!inGracePeriod && (activeAlarm.state == AlarmState.RUNNING || activeAlarm.state == AlarmState.PAUSED || activeAlarm.state == AlarmState.EXPIRED)) {
-                    Log.d("AlarmItem", "SYNC: Notification STOP detected -> Resetting UI (grace=${timeSinceStart}ms)")
-                    onUpdate(activeAlarm.copy(
-                        isActive = false,
-                        state = AlarmState.RESET,
-                        scheduledTime = 0L,
-                        pausedRemainingMs = 0L
-                    ))
-                }
             }
+        } else {
+            // Remote is NOT Active (STOPPED or different alarm)
+            // If local state is Running/Paused, we must Reset (Stop detected)
             
-            delay(250) // Poll 4Hz for snappy response
+            // Grace period check
+            val timeSinceStart = System.currentTimeMillis() - localStartTime
+            val inGracePeriod = activeAlarm.isActive && timeSinceStart < 500 // Reduced grace period since Service is fixed
+            
+            if (!inGracePeriod && (activeAlarm.state == AlarmState.RUNNING || activeAlarm.state == AlarmState.PAUSED || activeAlarm.state == AlarmState.EXPIRED)) {
+                Log.d("AlarmItem", "SYNC: Notification STOP detected -> Resetting UI (grace=${timeSinceStart}ms)")
+                onUpdate(activeAlarm.copy(
+                    isActive = false,
+                    state = AlarmState.RESET,
+                    scheduledTime = 0L,
+                    pausedRemainingMs = 0L
+                ))
+            }
         }
     }
     
