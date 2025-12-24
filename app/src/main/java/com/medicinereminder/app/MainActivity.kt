@@ -15,6 +15,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.rememberScrollState
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
@@ -1115,6 +1118,65 @@ fun AlarmItem(
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Sound selector button - expands when custom sound selected
+                    val hasCustomSound = alarm.soundUri != null
+                    val soundName = try {
+                        if (hasCustomSound) {
+                            val ringtone = RingtoneManager.getRingtone(context, Uri.parse(alarm.soundUri))
+                            ringtone.getTitle(context)
+                        } else {
+                            ""
+                        }
+                    } catch (e: Exception) {
+                        "Custom"
+                    }
+                    
+                    Surface(
+                        onClick = {
+                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound")
+                                alarm.soundUri?.let { uri ->
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(uri))
+                                }
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                            }
+                            soundPickerLauncher.launch(intent)
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color.Transparent,
+                        modifier = Modifier.animateContentSize()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.MusicNote,
+                                contentDescription = "Select Sound",
+                                modifier = Modifier.size(22.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            
+                            if (hasCustomSound) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .widthIn(max = 100.dp)
+                                        .horizontalScroll(rememberScrollState())
+                                ) {
+                                    Text(
+                                        text = soundName,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
                     // Clone button
                     IconButton(onClick = onClone) {
                         Icon(
@@ -1408,42 +1470,6 @@ fun AlarmItem(
                             }
                         )
                     }
-                }
-                
-                // Sound selector (compact)
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedButton(
-                    onClick = {
-                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound")
-                            alarm.soundUri?.let { uri ->
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(uri))
-                            }
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
-                        }
-                        soundPickerLauncher.launch(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Icon(Icons.Outlined.MoreVert, null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = try {
-                            if (alarm.soundUri != null) {
-                                val ringtone = RingtoneManager.getRingtone(context, Uri.parse(alarm.soundUri))
-                                ringtone.getTitle(context)
-                            } else {
-                                "Default Alarm Sound"
-                            }
-                        } catch (e: Exception) {
-                            "Custom Sound"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1
-                    )
                 }
             }
         }
