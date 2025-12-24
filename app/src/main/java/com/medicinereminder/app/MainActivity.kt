@@ -17,6 +17,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.basicMarquee
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedContent
@@ -1095,7 +1097,7 @@ fun StickyChainBar(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AlarmItem(
     alarm: Alarm,
@@ -1279,20 +1281,43 @@ fun AlarmItem(
                         .clickable(enabled = isEditable) { showNameDialog = true }
                         .padding(6.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.TextFields,
-                        contentDescription = "Edit label",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    if (isEditable) {
+                        // show icon always if editable? Or only if blank?
+                        // User said: "icon ... should only be shown if you haven't put any name"
+                        // But also "when there's low space the name... should roll"
+                        
+                        if (alarm.name.isBlank()) {
+                            Icon(
+                                imageVector = Icons.Outlined.TextFields,
+                                contentDescription = "Edit label",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                    } else {
+                        // If not editable, same logic? 
+                        // User request didn't specify mode, just "the icon... should only be shown..."
+                        if (alarm.name.isBlank()) {
+                            Icon(
+                                imageVector = Icons.Outlined.TextFields,
+                                contentDescription = "Edit label",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                    }
+                    
                     Text(
                         text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (alarm.name.isNotBlank()) 
                             MaterialTheme.colorScheme.onSurface 
                         else 
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.basicMarquee()
                     )
                 }
                 
