@@ -13,6 +13,7 @@ class SettingsRepository(context: Context) {
         const val KEY_BATTERY_WARNING_NEVER_SHOW = "battery_warning_never_show"
         const val KEY_DEFAULT_ALARM_TIME = "default_alarm_time"
         const val KEY_FORCE_BATTERY_WARNING = "debug_force_battery_warning"
+        const val KEY_FIRST_LAUNCH_COMPLETE = "first_launch_complete"
         
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
@@ -73,5 +74,13 @@ class SettingsRepository(context: Context) {
     
     fun setForceBatteryWarning(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_FORCE_BATTERY_WARNING, enabled).apply()
+    }
+    
+    fun isFirstLaunchComplete(): Boolean {
+        return prefs.getBoolean(KEY_FIRST_LAUNCH_COMPLETE, false)
+    }
+    
+    fun setFirstLaunchComplete(completed: Boolean) {
+        prefs.edit().putBoolean(KEY_FIRST_LAUNCH_COMPLETE, completed).apply()
     }
 }

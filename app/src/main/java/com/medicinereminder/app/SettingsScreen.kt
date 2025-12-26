@@ -21,7 +21,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onThemeChanged: () -> Unit
+    onThemeChanged: () -> Unit,
+    onOpenPermissions: () -> Unit
 ) {
     val context = LocalContext.current
     val repository = remember { SettingsRepository(context) }
@@ -213,6 +214,14 @@ fun SettingsScreen(
                 tonalElevation = 1.dp
             ) {
                 Column {
+                    SettingsClickableItem(
+                        title = context.getString(R.string.settings_permissions),
+                        subtitle = context.getString(R.string.settings_permissions_desc),
+                        onClick = onOpenPermissions
+                    )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                    
                     SettingsClickableItem(
                         title = context.getString(R.string.settings_autostart),
                         subtitle = context.getString(R.string.settings_autostart_desc),

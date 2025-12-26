@@ -54,4 +54,20 @@
     <string name="settings_default_time">Default Alarm Time</string>
     <string name="settings_default_time_desc">Set the default duration for new alarms</string>
     <string name="settings_default_time_dialog_title">Set Default Alarm Time</string>
+    
+    <!-- Permissions Screen -->
+    <string name="permissions_title">Setup Permissions</string>
+    <string name="permissions_subtitle">Grant these permissions for the best experience</string>
+    <string name="permissions_battery_title">Battery Optimization</string>
+    <string name="permissions_battery_desc">Allows the app to run in the background and ensure alarms trigger reliably even when the screen is off</string>
+    <string name="permissions_notification_title">Notifications</string>
+    <string name="permissions_notification_desc">Required to show alarm notifications when timers complete</string>
+    <string name="permissions_fullscreen_title">Fullscreen Notifications</string>
+    <string name="permissions_fullscreen_desc">Allows full-screen alarm alerts to appear over other apps (future feature)</string>
+    <string name="permissions_status_granted">Granted</string>
+    <string name="permissions_status_not_granted">Not Granted</string>
+    <string name="permissions_action_grant">Grant Permission</string>
+    <string name="permissions_done_button">Done</string>
+    <string name="settings_permissions">App Permissions</string>
+    <string name="settings_permissions_desc">Manage notification, battery, and fullscreen permissions</string>
 </resources>

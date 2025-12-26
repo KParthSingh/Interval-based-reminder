@@ -43,6 +43,7 @@ import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.*
@@ -81,6 +82,9 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.draw.alpha
 import kotlinx.coroutines.isActive
 
+// Navigation screens
+enum class Screen { Main, Settings, Permissions }
+
 class MainActivity : ComponentActivity() {
     private lateinit var alarmScheduler: AlarmScheduler
     private var hasNotificationPermission by mutableStateOf(true)
@@ -107,74 +111,93 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settingsRepository = remember { SettingsRepository(this) }
             var themeMode by remember { mutableStateOf(settingsRepository.getThemeMode()) }
-            var showSettings by remember { mutableStateOf(false) }
+            
+            // Navigation state
+            var currentScreen by remember { 
+                mutableStateOf(
+                    if (!settingsRepository.isFirstLaunchComplete()) Screen.Permissions 
+                    else Screen.Main
+                )
+            }
             
             MedicineReminderTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // Handle back button when settings is open
-                    if (showSettings) {
+                    // Handle back button
+                    if (currentScreen != Screen.Main) {
                         androidx.activity.compose.BackHandler {
-                            showSettings = false
+                            currentScreen = Screen.Main
                         }
                     }
                     
                     // Animated transition between screens
                     AnimatedContent(
-                        targetState = showSettings,
+                        targetState = currentScreen,
                         transitionSpec = {
                             // Define the slide + fade transition
                             val slideOffset = 1000 // pixels to slide from
                             val duration = 400 // duration in milliseconds
                             
-                            if (targetState) {
-                                // Going to Settings: slide in from right + fade in
-                                (slideInHorizontally(
-                                    initialOffsetX = { slideOffset },
-                                    animationSpec = tween(duration)
-                                ) + fadeIn(
-                                    animationSpec = tween(duration)
-                                )).togetherWith(
-                                    slideOutHorizontally(
-                                        targetOffsetX = { -slideOffset },
+                            when {
+                                // Going to Settings or Permissions: slide in from right
+                                targetState == Screen.Settings || targetState == Screen.Permissions -> {
+                                    (slideInHorizontally(
+                                        initialOffsetX = { slideOffset },
                                         animationSpec = tween(duration)
-                                    ) + fadeOut(
+                                    ) + fadeIn(
                                         animationSpec = tween(duration)
+                                    )).togetherWith(
+                                        slideOutHorizontally(
+                                            targetOffsetX = { -slideOffset },
+                                            animationSpec = tween(duration)
+                                        ) + fadeOut(
+                                            animationSpec = tween(duration)
+                                        )
                                     )
-                                )
-                            } else {
-                                // Going back to Main: slide in from left + fade in
-                                (slideInHorizontally(
-                                    initialOffsetX = { -slideOffset },
-                                    animationSpec = tween(duration)
-                                ) + fadeIn(
-                                    animationSpec = tween(duration)
-                                )).togetherWith(
-                                    slideOutHorizontally(
-                                        targetOffsetX = { slideOffset },
+                                }
+                                // Going back to Main: slide in from left
+                                else -> {
+                                    (slideInHorizontally(
+                                        initialOffsetX = { -slideOffset },
                                         animationSpec = tween(duration)
-                                    ) + fadeOut(
+                                    ) + fadeIn(
                                         animationSpec = tween(duration)
+                                    )).togetherWith(
+                                        slideOutHorizontally(
+                                            targetOffsetX = { slideOffset },
+                                            animationSpec = tween(duration)
+                                        ) + fadeOut(
+                                            animationSpec = tween(duration)
+                                        )
                                     )
-                                )
+                                }
                             }
                         },
                         label = "screen_transition"
-                    ) { isSettings ->
-                        if (isSettings) {
-                            SettingsScreen(
-                                onNavigateBack = { showSettings = false },
-                                onThemeChanged = { themeMode = settingsRepository.getThemeMode() }
-                            )
-                        } else {
-                            MainScreen(
-                                onScheduleAlarm = { delayMillis, requestCode, name, current, total, isChain ->
-                                    scheduleAlarm(delayMillis, requestCode, name, current, total, isChain)
-                                },
-                                onOpenSettings = { showSettings = true }
-                            )
+                    ) { screen ->
+                        when (screen) {
+                            Screen.Settings -> {
+                                SettingsScreen(
+                                    onNavigateBack = { currentScreen = Screen.Main },
+                                    onThemeChanged = { themeMode = settingsRepository.getThemeMode() },
+                                    onOpenPermissions = { currentScreen = Screen.Permissions }
+                                )
+                            }
+                            Screen.Permissions -> {
+                                PermissionsScreen(
+                                    onNavigateBack = { currentScreen = Screen.Main }
+                                )
+                            }
+                            Screen.Main -> {
+                                MainScreen(
+                                    onScheduleAlarm = { delayMillis, requestCode, name, current, total, isChain ->
+                                        scheduleAlarm(delayMillis, requestCode, name, current, total, isChain)
+                                    },
+                                    onOpenSettings = { currentScreen = Screen.Settings }
+                                )
+                            }
                         }
                     }
                 }
@@ -327,7 +350,7 @@ fun MainScreen(
                 actions = {
                     IconButton(onClick = onOpenSettings) {
                         Icon(
-                            Icons.Default.Settings,
+                            Icons.Outlined.Settings,
                             contentDescription = "Settings"
                         )
                     }
@@ -640,10 +663,6 @@ fun MainScreen(
                         )
                 }
             ) {
-                item {
-                    BatteryOptimizationWarning()
-                }
-                
                 if (alarms.isEmpty()) {
                     item { EmptyState() }
                 } else {
@@ -763,131 +782,6 @@ fun EmptyState() {
     }
 }
 
-@Composable
-fun BatteryOptimizationWarning() {
-    val context = LocalContext.current
-    val settingsRepository = remember { SettingsRepository(context) }
-    
-    // Track visibility state
-    var isVisible by remember { mutableStateOf(false) }
-    
-    // Check if warning should be shown
-    LaunchedEffect(Unit) {
-        val forceShow = settingsRepository.getForceBatteryWarning()
-        val showWarning = forceShow || (ManufacturerDetector.requiresAutostartWarning() && 
-                         !settingsRepository.getBatteryWarningNeverShow())
-        isVisible = showWarning
-    }
-    
-    if (isVisible) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.errorContainer,
-            tonalElevation = 2.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Title
-                Text(
-                    text = stringResource(R.string.battery_warning_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                
-                // Description
-                Text(
-                    text = stringResource(R.string.battery_warning_message),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                
-                // Buttons Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Open Settings Button
-                    OutlinedButton(
-                        onClick = {
-                            AutostartHelper.openAutostartSettings(context)
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        ),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.onErrorContainer,
-                                    MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            )
-                        )
-                    ) {
-                        Text(
-                            stringResource(R.string.battery_warning_btn_settings),
-                            fontSize = 12.sp
-                        )
-                    }
-                    
-                    // Autostart Enabled Button
-                    Button(
-                        onClick = {
-                            settingsRepository.setBatteryWarningNeverShow(true)
-                            isVisible = false
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError
-                        )
-                    ) {
-                        Text(
-                            stringResource(R.string.battery_warning_btn_enabled),
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-                
-                // Secondary buttons row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Hide for Now Button
-                    TextButton(
-                        onClick = {
-                            isVisible = false
-                        }
-                    ) {
-                        Text(
-                            stringResource(R.string.battery_warning_btn_hide),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                        )
-                    }
-                    
-                    // Never Show Again Button
-                    TextButton(
-                        onClick = {
-                            settingsRepository.setBatteryWarningNeverShow(true)
-                            isVisible = false
-                        }
-                    ) {
-                        Text(
-                            stringResource(R.string.battery_warning_btn_never),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun StickyChainBar(
