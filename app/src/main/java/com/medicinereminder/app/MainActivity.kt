@@ -8,6 +8,7 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -195,7 +197,8 @@ class MainActivity : ComponentActivity() {
                                     onScheduleAlarm = { delayMillis, requestCode, name, current, total, isChain ->
                                         scheduleAlarm(delayMillis, requestCode, name, current, total, isChain)
                                     },
-                                    onOpenSettings = { currentScreen = Screen.Settings }
+                                    onOpenSettings = { currentScreen = Screen.Settings },
+                                    onOpenPermissions = { currentScreen = Screen.Permissions }
                                 )
                             }
                         }
@@ -291,13 +294,46 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(
     onScheduleAlarm: (Long, Int, String, Int, Int, Boolean) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenPermissions: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val repository = remember { AlarmRepository(context) }
     // OPTIMIZED: Use SnapshotStateList for efficient O(1) mutations
     // We initialise it with an empty list first, then populate it
     val alarms = remember { mutableStateListOf<Alarm>() }
+    
+    // Check permission states
+    val powerManager = remember { context.getSystemService(PowerManager::class.java) }
+    val hasAllPermissions by remember {
+        derivedStateOf {
+            val batteryOptimized = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: true
+            } else {
+                true
+            }
+            
+            val notifications = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+            
+            val fullscreen = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.USE_FULL_SCREEN_INTENT
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+            
+            batteryOptimized && notifications && fullscreen
+        }
+    }
     
     // Initial load
     LaunchedEffect(Unit) {
@@ -348,6 +384,26 @@ fun MainScreen(
                     Text(stringResource(R.string.title_main))
                 },
                 actions = {
+                    // Warning pill button if permissions not granted
+                    if (!hasAllPermissions) {
+                        FilledTonalButton(
+                            onClick = onOpenPermissions,
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            ),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Warning,
+                                contentDescription = "Permissions",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("!", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    
                     IconButton(onClick = onOpenSettings) {
                         Icon(
                             Icons.Outlined.Settings,
@@ -1510,8 +1566,8 @@ fun AlarmItem(
                             contentPadding = PaddingValues(24.dp),
                             modifier = Modifier.size(80.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
                             )
                         ) {
                             Icon(

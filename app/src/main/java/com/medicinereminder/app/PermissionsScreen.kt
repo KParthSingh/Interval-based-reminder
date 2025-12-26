@@ -149,11 +149,6 @@ fun PermissionsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "⚙️",
-                    fontSize = 64.sp,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Text(
                     text = context.getString(R.string.permissions_subtitle),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
