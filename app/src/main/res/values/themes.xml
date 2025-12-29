@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Using standard theme, dark mode handled by Compose theme -->
-    <style name="Theme.MedicineReminder" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
-    </style>
+    <style name="Theme.MedicineReminder" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

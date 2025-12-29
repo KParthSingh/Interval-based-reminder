@@ -109,10 +109,6 @@ class MainActivity : ComponentActivity() {
         NotificationHelper.createNotificationChannel(this)
         checkNotificationPermission()
         checkExactAlarmPermission()
-        
-        // Pre-load alarms to avoid empty state flash
-        val repository = AlarmRepository(this)
-        val preloadedAlarms = repository.loadAlarms()
 
         setContent {
             val settingsRepository = remember { SettingsRepository(this) }
@@ -202,8 +198,7 @@ class MainActivity : ComponentActivity() {
                                         scheduleAlarm(delayMillis, requestCode, name, current, total, isChain)
                                     },
                                     onOpenSettings = { currentScreen = Screen.Settings },
-                                    onOpenPermissions = { currentScreen = Screen.Permissions },
-                                    preloadedAlarms = preloadedAlarms
+                                    onOpenPermissions = { currentScreen = Screen.Permissions }
                                 )
                             }
                         }
@@ -300,14 +295,13 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     onScheduleAlarm: (Long, Int, String, Int, Int, Boolean) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenPermissions: () -> Unit = {},
-    preloadedAlarms: List<Alarm> = emptyList()
+    onOpenPermissions: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val repository = remember { AlarmRepository(context) }
     // OPTIMIZED: Use SnapshotStateList for efficient O(1) mutations
-    // Initialize with preloaded alarms to avoid empty state flash
-    val alarms = remember { mutableStateListOf<Alarm>().apply { addAll(preloadedAlarms) } }
+    // We initialise it with an empty list first, then populate it
+    val alarms = remember { mutableStateListOf<Alarm>() }
     
     // Check permission states
     val powerManager = remember { context.getSystemService(PowerManager::class.java) }
@@ -341,15 +335,11 @@ fun MainScreen(
         }
     }
     
-    // Sync with repository in background (only for changes made elsewhere)
+    // Initial load
     LaunchedEffect(Unit) {
-        repository.getAlarmsFlow().collect { newAlarms ->
-            // Only update if content changed remotely
-            if (newAlarms.size != alarms.size || newAlarms.map { it.id } != alarms.map { it.id }) {
-                alarms.clear()
-                alarms.addAll(newAlarms)
-            }
-        }
+        val loaded = repository.loadAlarms()
+        alarms.clear()
+        alarms.addAll(loaded)
     }
 
     val chainManager = remember { ChainManager(context) }
@@ -361,6 +351,21 @@ fun MainScreen(
     val currentChainIndex = chainState.currentIndex
     val isAlarmRinging = chainState.isAlarmRinging
     val isChainSequence = chainState.isChainSequence
+
+    // Observe Alarms Flow (Hybrid approach to support Drag & Drop)
+    LaunchedEffect(Unit) {
+        repository.getAlarmsFlow().collect { newAlarms ->
+            // Only update if content changed remotely AND we are not dragging?
+            // For now, simple diff check. 
+            // Only effective way to check efficiently is if sizes or IDs differ
+            if (newAlarms.size != alarms.size || newAlarms.map { it.id } != alarms.map { it.id }) {
+                 // Make sure we don't clobber local state if it's identical
+                 // (This is a simplified check, proper would be deep equals but expensive)
+                 alarms.clear()
+                 alarms.addAll(newAlarms)
+            }
+        }
+    }
     
     // Helper to save state explicitly
     fun saveAlarms() {
