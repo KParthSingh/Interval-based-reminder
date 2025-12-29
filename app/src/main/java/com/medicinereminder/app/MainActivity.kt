@@ -302,6 +302,7 @@ fun MainScreen(
     // OPTIMIZED: Use SnapshotStateList for efficient O(1) mutations
     // We initialise it with an empty list first, then populate it
     val alarms = remember { mutableStateListOf<Alarm>() }
+    var isInitialLoadComplete by remember { mutableStateOf(false) }
     
     // Check permission states
     val powerManager = remember { context.getSystemService(PowerManager::class.java) }
@@ -338,6 +339,7 @@ fun MainScreen(
         val loaded = repository.loadAlarms()
         alarms.clear()
         alarms.addAll(loaded)
+        isInitialLoadComplete = true  // Mark as loaded
     }
 
     val chainManager = remember { ChainManager(context) }
@@ -386,6 +388,11 @@ fun MainScreen(
 
     // REMOVED: LaunchedEffect(alarms) auto-saver to prevent lag during drag
 
+    // Show nothing until initial load completes to prevent flash of empty screen
+    if (!isInitialLoadComplete) {
+        Box(modifier = Modifier.fillMaxSize())
+        return
+    }
 
     Scaffold(
         topBar = {
