@@ -1,6 +1,7 @@
 package com.medicinereminder.app
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.Battery6Bar
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.ScreenLockPortrait
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,6 +45,7 @@ fun PermissionsScreen(
 ) {
     val context = LocalContext.current
     val powerManager = remember { context.getSystemService(PowerManager::class.java) }
+    val notificationManager = remember { context.getSystemService(NotificationManager::class.java) }
     
     // Track permission states
     var batteryOptimizationGranted by remember {
@@ -71,13 +74,21 @@ fun PermissionsScreen(
     var fullscreenPermissionGranted by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.USE_FULL_SCREEN_INTENT
-                ) == PackageManager.PERMISSION_GRANTED
+                notificationManager?.canUseFullScreenIntent() ?: false
             } else {
                 true // Not required on older versions
             }
+        )
+    }
+    
+    // Wake lock is a normal permission (granted at install time)
+    // We track it here for UI purposes, but it's always granted
+    var wakeLockPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.WAKE_LOCK
+            ) == PackageManager.PERMISSION_GRANTED
         )
     }
     
@@ -95,11 +106,12 @@ fun PermissionsScreen(
             ) == PackageManager.PERMISSION_GRANTED
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            fullscreenPermissionGranted = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.USE_FULL_SCREEN_INTENT
-            ) == PackageManager.PERMISSION_GRANTED
+            fullscreenPermissionGranted = notificationManager?.canUseFullScreenIntent() ?: false
         }
+        wakeLockPermissionGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.WAKE_LOCK
+        ) == PackageManager.PERMISSION_GRANTED
     }
     
     // Refresh permissions when app resumes (returns from settings)
@@ -177,15 +189,23 @@ fun PermissionsScreen(
                         onClick = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                                 try {
-                                    // Open app-specific battery optimization dialog
+                                    // Open app-specific battery optimization settings
                                     val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                                         data = Uri.parse("package:${context.packageName}")
                                     }
                                     context.startActivity(intent)
                                 } catch (e: Exception) {
-                                    // Fallback to general battery settings if the dialog doesn't work
-                                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                    context.startActivity(intent)
+                                    // Fallback to app details page
+                                    try {
+                                        val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                        context.startActivity(fallbackIntent)
+                                    } catch (e2: Exception) {
+                                        // Last resort - general settings
+                                        val generalIntent = Intent(Settings.ACTION_SETTINGS)
+                                        context.startActivity(generalIntent)
+                                    }
                                 }
                             }
                         }
@@ -201,17 +221,55 @@ fun PermissionsScreen(
                         isGranted = fullscreenPermissionGranted,
                         onClick = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = Uri.parse("package:${context.packageName}")
+                                try {
+                                    // Open app-specific settings for fullscreen intent
+                                    val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    // Fallback to app details
+                                    try {
+                                        val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                        context.startActivity(fallbackIntent)
+                                    } catch (e2: Exception) {
+                                        // Last resort
+                                        val generalIntent = Intent(Settings.ACTION_SETTINGS)
+                                        context.startActivity(generalIntent)
+                                    }
                                 }
-                                context.startActivity(intent)
                             }
                         }
                     )
                     
                     HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
                     
-                    // Notification Permission (moved to last as it's asked first)
+                    // Wake Lock Permission (Turn On Screen)
+                    PermissionItem(
+                        icon = Icons.Default.ScreenLockPortrait,
+                        title = context.getString(R.string.permissions_wakelock_title),
+                        description = context.getString(R.string.permissions_wakelock_desc),
+                        isGranted = wakeLockPermissionGranted,
+                        onClick = {
+                            // Open app-specific settings for wake lock
+                            try {
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                // Fallback to general settings
+                                val generalIntent = Intent(Settings.ACTION_SETTINGS)
+                                context.startActivity(generalIntent)
+                            }
+                        }
+                    )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                    
+                    // Notification Permission
                     PermissionItem(
                         icon = Icons.Default.Notifications,
                         title = context.getString(R.string.permissions_notification_title),
@@ -219,10 +277,25 @@ fun PermissionsScreen(
                         isGranted = notificationPermissionGranted,
                         onClick = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = Uri.parse("package:${context.packageName}")
+                                try {
+                                    // Try to open app-specific notification settings
+                                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    // Fallback to app details
+                                    try {
+                                        val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                        context.startActivity(fallbackIntent)
+                                    } catch (e2: Exception) {
+                                        // Last resort
+                                        val generalIntent = Intent(Settings.ACTION_SETTINGS)
+                                        context.startActivity(generalIntent)
+                                    }
                                 }
-                                context.startActivity(intent)
                             }
                         }
                     )

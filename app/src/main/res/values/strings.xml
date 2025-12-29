@@ -63,7 +63,9 @@
     <string name="permissions_notification_title">Notifications</string>
     <string name="permissions_notification_desc">Required to show alarm notifications when timers complete</string>
     <string name="permissions_fullscreen_title">Fullscreen Notifications</string>
-    <string name="permissions_fullscreen_desc">Allows full-screen alarm alerts to appear over other apps (future feature)</string>
+    <string name="permissions_fullscreen_desc">Allows full-screen alarm alerts to appear over other apps</string>
+    <string name="permissions_wakelock_title">Turn On Screen</string>
+    <string name="permissions_wakelock_desc">Allows the app to wake up your screen when an alarm triggers</string>
     <string name="permissions_status_granted">Granted</string>
     <string name="permissions_status_not_granted">Not Granted</string>
     <string name="permissions_action_grant">Grant Permission</string>
