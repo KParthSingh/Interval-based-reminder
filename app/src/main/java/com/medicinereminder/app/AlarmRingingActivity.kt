@@ -37,6 +37,9 @@ class AlarmRingingActivity : ComponentActivity() {
     
     companion object {
         const val EXTRA_ALARM_NAME = "extra_alarm_name"
+        const val EXTRA_ALARM_HOURS = "extra_alarm_hours"
+        const val EXTRA_ALARM_MINUTES = "extra_alarm_minutes"
+        const val EXTRA_ALARM_SECONDS = "extra_alarm_seconds"
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,11 +59,17 @@ class AlarmRingingActivity : ComponentActivity() {
         }
         
         val alarmName = intent.getStringExtra(EXTRA_ALARM_NAME) ?: "Alarm"
+        val alarmHours = intent.getIntExtra(EXTRA_ALARM_HOURS, 0)
+        val alarmMinutes = intent.getIntExtra(EXTRA_ALARM_MINUTES, 0)
+        val alarmSeconds = intent.getIntExtra(EXTRA_ALARM_SECONDS, 5)
         
         setContent {
             MedicineReminderTheme {
                 AlarmRingingScreen(
                     alarmName = alarmName,
+                    alarmHours = alarmHours,
+                    alarmMinutes = alarmMinutes,
+                    alarmSeconds = alarmSeconds,
                     onDismiss = {
                         dismissAlarm()
                     }
@@ -101,23 +110,29 @@ class AlarmRingingActivity : ComponentActivity() {
 @Composable
 fun AlarmRingingScreen(
     alarmName: String,
+    alarmHours: Int,
+    alarmMinutes: Int,
+    alarmSeconds: Int,
     onDismiss: () -> Unit
 ) {
     val view = LocalView.current
     var swipeOffset by remember { mutableFloatStateOf(0f) }
     val swipeThreshold = -300f
     
-    // Pulsing animation for the icon
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
+    // Format the alarm duration like in the alarm card
+    val formattedDuration = remember(alarmHours, alarmMinutes, alarmSeconds) {
+        when {
+            alarmHours > 0 -> {
+                String.format("%d:%02d:%02d", alarmHours, alarmMinutes, alarmSeconds)
+            }
+            alarmMinutes > 0 -> {
+                String.format("%d:%02d", alarmMinutes, alarmSeconds)
+            }
+            else -> {
+                "$alarmSeconds Sec"
+            }
+        }
+    }
     
     // Get current time
     val currentTime = remember {
@@ -154,73 +169,80 @@ fun AlarmRingingScreen(
                 .graphicsLayer { translationY = swipeOffset }
                 .padding(32.dp)
         ) {
-            // Top section with time
+            // Top section with custom alarm name (if set) and time
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 48.dp)
+                modifier = Modifier.padding(top = 50.dp)
             ) {
-                Text(
-                    text = currentTime,
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Light,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Only show alarm name if it's custom (not default)
+                if (alarmName.isNotBlank() && alarmName != "Alarm") {
+                    Text(
+                        text = alarmName,
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = currentTime,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Light,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    // If no custom name, just show time large
+                    Text(
+                        text = currentTime,
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Light,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             
-            // Center section with icon and alarm info
+            // Center section with timer circle
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.weight(1f)
             ) {
-                // Pulsing icon
-                Surface(
-                    modifier = Modifier
-                        .size(140.dp)
-                        .scale(scale),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    tonalElevation = 8.dp
+                // Timer circle in ringing/expired state (red blinking)
+                Box(
+                    modifier = Modifier.size(300.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
+                    com.medicinereminder.app.ui.TimerCircleView(
+                        scheduledTime = 0L,
+                        totalDuration = 1000L,
+                        isExpired = true,  // This makes it red and blinking
+                        isPaused = false,
+                        pausedRemainingMs = 0L,
                         modifier = Modifier.fillMaxSize()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Alarm,
-                            contentDescription = null,
-                            modifier = Modifier.size(72.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
+                    )
+                    
+                    // Time display in the center (like alarm card UI)
+                    Text(
+                        text = formattedDuration,
+                        style = MaterialTheme.typography.displayMedium.copy(fontSize = 42.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
                 
                 Spacer(modifier = Modifier.height(40.dp))
                 
-                // Alarm title
-                Text(
-                    text = "Alarm Ringing!",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                // Alarm name
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                ) {
+                // Show "Alarm Ringing!" title only if no custom name
+                if (alarmName.isBlank() || alarmName == "Alarm") {
                     Text(
-                        text = alarmName,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                        text = "Alarm Ringing!",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
                     )
                 }
             }

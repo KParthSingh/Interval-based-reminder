@@ -36,8 +36,8 @@ data class Alarm(
                 String.format("%d:%02d", minutes, seconds)
             }
             else -> {
-                // Show seconds only: "30 secs" or "5 secs"
-                "$seconds Secs"
+                // Show seconds only: "30 sec" or "5 sec"
+                "$seconds Sec"
             }
         }
     }
