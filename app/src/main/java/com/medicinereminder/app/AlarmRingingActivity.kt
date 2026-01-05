@@ -72,6 +72,9 @@ class AlarmRingingActivity : ComponentActivity() {
                     alarmSeconds = alarmSeconds,
                     onDismiss = {
                         dismissAlarm()
+                    },
+                    onDismissAndOpenApp = {
+                        dismissAlarmAndOpenApp()
                     }
                 )
             }
@@ -101,6 +104,35 @@ class AlarmRingingActivity : ComponentActivity() {
         finish()
     }
 
+    private fun dismissAlarmAndOpenApp() {
+        // Dismiss both notification IDs for safety (we now use CHAIN_NOTIFICATION_ID)
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+        notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
+        notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
+        
+        val serviceIntent = Intent(this, AlarmService::class.java)
+        stopService(serviceIntent)
+        
+        // DELEGATE NEXT STEP TO CHAIN SERVICE
+        // ChainService will check isChainSequence() and stop if false.
+        val nextIntent = Intent(this, ChainService::class.java).apply {
+            action = ChainService.ACTION_NEXT_ALARM
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(nextIntent)
+        } else {
+            startService(nextIntent)
+        }
+        
+        // Launch the main activity
+        val mainIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        startActivity(mainIntent)
+        
+        finish()
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         // Prevent back button from dismissing alarm
@@ -113,7 +145,8 @@ fun AlarmRingingScreen(
     alarmHours: Int,
     alarmMinutes: Int,
     alarmSeconds: Int,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onDismissAndOpenApp: () -> Unit
 ) {
     val view = LocalView.current
     var swipeOffset by remember { mutableFloatStateOf(0f) }
@@ -276,6 +309,35 @@ fun AlarmRingingScreen(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.2.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Dismiss & Open App Button
+                Button(
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                        onDismissAndOpenApp()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp),
+                    shape = RoundedCornerShape(36.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Text(
+                        text = "DISMISS & OPEN APP",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
                 }
                 
