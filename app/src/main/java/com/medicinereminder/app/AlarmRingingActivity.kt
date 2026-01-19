@@ -196,16 +196,17 @@ fun AlarmRingingScreen(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { translationY = swipeOffset }
-                .padding(32.dp)
+                .padding(horizontal = 32.dp)
+                .systemBarsPadding()
         ) {
+            Spacer(modifier = Modifier.height(32.dp))
+            
             // Top section with custom alarm name (if set) and time
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 50.dp)
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Only show alarm name if it's custom (not default)
                 if (alarmName.isNotBlank() && alarmName != "Alarm") {
@@ -237,53 +238,59 @@ fun AlarmRingingScreen(
                 }
             }
             
-            // Center section with timer circle
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.weight(1f)
+            // Center section with timer circle - takes remaining space
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                // Timer circle in ringing/expired state (red blinking)
-                Box(
-                    modifier = Modifier.size(300.dp),
-                    contentAlignment = Alignment.Center
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    com.medicinereminder.app.ui.TimerCircleView(
-                        scheduledTime = 0L,
-                        totalDuration = 1000L,
-                        isExpired = true,  // This makes it red and blinking
-                        isPaused = false,
-                        pausedRemainingMs = 0L,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    // Timer circle in ringing/expired state (red blinking)
+                    Box(
+                        modifier = Modifier.size(240.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        com.medicinereminder.app.ui.TimerCircleView(
+                            scheduledTime = 0L,
+                            totalDuration = 1000L,
+                            isExpired = true,  // This makes it red and blinking
+                            isPaused = false,
+                            pausedRemainingMs = 0L,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        
+                        // Time display in the center (like alarm card UI)
+                        Text(
+                            text = formattedDuration,
+                            style = MaterialTheme.typography.displayMedium.copy(fontSize = 36.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     
-                    // Time display in the center (like alarm card UI)
-                    Text(
-                        text = formattedDuration,
-                        style = MaterialTheme.typography.displayMedium.copy(fontSize = 42.sp),
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(40.dp))
-                
-                // Show "Alarm Ringing!" title only if no custom name
-                if (alarmName.isBlank() || alarmName == "Alarm") {
-                    Text(
-                        text = "Alarm Ringing!",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center
-                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Show "Alarm Ringing!" title only if no custom name
+                    if (alarmName.isBlank() || alarmName == "Alarm") {
+                        Text(
+                            text = "Alarm Ringing!",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
             
             // Bottom section with dismiss button and swipe hint
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 32.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 // Dismiss Button
                 Button(
@@ -293,8 +300,8 @@ fun AlarmRingingScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(72.dp),
-                    shape = RoundedCornerShape(36.dp),
+                        .height(56.dp),
+                    shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
@@ -306,7 +313,7 @@ fun AlarmRingingScreen(
                 ) {
                     Text(
                         text = "DISMISS",
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.2.sp
                     )
@@ -322,8 +329,8 @@ fun AlarmRingingScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(72.dp),
-                    shape = RoundedCornerShape(36.dp),
+                        .height(56.dp),
+                    shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -335,13 +342,13 @@ fun AlarmRingingScreen(
                 ) {
                     Text(
                         text = "DISMISS & OPEN APP",
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 // Swipe hint
                 Text(
