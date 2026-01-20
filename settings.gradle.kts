@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MedicineReminder"
+rootProject.name = "RelativeTimer"
 include(":app")

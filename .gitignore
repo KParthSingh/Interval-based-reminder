@@ -12,3 +12,5 @@ changes.txt
 *.jks
 *.keystore
 signing.properties
+*.json
+*.apk
