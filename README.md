@@ -1,4 +1,4 @@
-# Reminder App
+# Relative Interval timer app
 Interval‑based reminder app for Android.
 
 > **WARNING: This was created with help of AI**
@@ -17,7 +17,7 @@ Regular alarm apps can’t handle this. They want fixed times, not “start coun
 
 This project was built for people whose routines look like:
 
-“Take this pill… then 30 minutes later take that pill… then 30 minutes later eat… then 4 hours later take the next thing… then 4 more hours… then 4 more hours…”
+“Take this pill… then 30 minutes later take that pill… then 30 minutes later eat… then 4 hours later take the next thing… then 10 minutes… then 4 more hours…” Basically pomodoro with extra steps.
 
 “Start whenever I manage to start. Everything else follows automatically.”
 
@@ -33,6 +33,8 @@ Folks with changing daily schedules
 
 Caregivers managing medication for others
 
+Pomodoro app that works like a proper alarm and different intervals.
+
 People who want interval-based reminders for cooking, productivity cycles, workouts, or task chains
 
 Anyone who’s silently yelling “why does no timer app just do this one simple thing”
@@ -47,75 +49,53 @@ Medisafe, MyTherapy etc. -> Still expect you to set absolute times or “every 8
 
 Countdown timer apps -> Die when screen off, no sequencing, no persistence
 
-Workout timer apps -> Great for intervals but no medication-style snooze/dismiss logic
+Workout timer apps -> Great for intervals but no snooze/dismiss logic, useless for other things
 
-## Overview
+## App Overview
 
-Medicine Reminder App enables users to create sequences of alarms that trigger automatically at specified intervals. The application provides reliable background execution, comprehensive playback controls, and real-time progress tracking.
+Relative Interval Timer lets you create flexible chains of alarms/reminders that trigger at intervals you define, starting from any time you choose.
 
-## Use Cases
+## Main Features
 
-- Multi-medication schedules with specific intervals
-- Interval training and workout timers
+- **Material Design UI:** Modern, clean interface with real-time countdowns and progress indicators. Dark and light themes supported.
+- **Interval Chains:** Create sequences of alarms, each with its own duration (hours, minutes, seconds). Start the chain at any time; all subsequent alarms follow your custom intervals.
+- **Reorder & Clone:** Drag to reorder alarms, clone any alarm for fast duplication, and delete with one tap.
+- **Naming:** Give each alarm a custom name for clarity (e.g., “Take Pill”, “Eat”, “Workout”).
+- **Playback Controls:** Pause/resume the entire sequence, skip forward/back, or stop at any time.
+- **Reliable Background Service:** Alarms run reliably even if the app is closed, device is locked, or in Do Not Disturb mode (with permissions).
+- **Persistent Storage:** All alarm chains are saved automatically. Restore your routine after device restarts.
+- **Notifications:** High-priority notifications for alarms, with controls to pause, skip, or dismiss directly from the notification shade.
+- **Validation:** Prevents invalid alarm chains (e.g., zero duration, duplicate times).
+
+## Typical Use Cases
+
+- Medication schedules with variable start times
+- Pomodoro or productivity cycles
 - Multi-stage cooking timers
-- Sequential task reminders
-- Pomodoro-style study sessions
-- Daily health routine reminders
+- Interval training/workouts
+- Task chains that depend on when you begin
 
-## Key Features
+## How to Use
 
-**Alarm Sequencing**
-- Chain multiple alarms to trigger sequentially
-- Set precise durations (hours, minutes, seconds)
-- Quick add buttons for common time increments
-- Reorder alarms via drag and drop
-- Optional naming for each alarm
-
-**Playback Controls**
-- Pause and resume entire sequences
-- Navigate forward/backward through alarm chain
-- Stop sequences or dismiss individual alarms
-- Start individual alarms independently for testing
-
-**Background Reliability**
-- Foreground service ensures consistent operation
-- Functions when device is locked or screen is off
-- Overrides silent/DND mode (with permissions)
-- Persists through device restarts
-
-**User Interface**
-- Material Design 3 implementation
-- Real-time countdown display
-- Visual progress indicators
-- Pause state synchronization
-- Notification controls for all playback functions
-
-**Data Management**
-- Automatic persistent storage
-- Clone alarms for quick duplication
-- Delete and reorder operations
-- Validation for invalid configurations
+1. Tap **Add Alarm** to create a new interval.
+2. Set the duration and (optionally) a name.
+3. Use quick add buttons for common intervals or enter a custom time.
+4. Drag to reorder alarms, clone, or delete as needed.
+5. Tap **Start** to begin the sequence. The first alarm starts immediately; others follow at your set intervals.
+6. Use playback controls (Pause, Resume, Next, Previous, Stop) as needed during the sequence.
+7. Dismiss alarms when they ring to continue to the next.
 
 ## Requirements
 
-- Android 10 (API 29) or higher
-- Permissions: Notifications, Exact Alarms, Foreground Service
+- Android 10 (API 29) or newer
+- Permissions: Notifications, Foreground Service, Autostart (recommended for reliability)
 
-**Creating Sequences**
-1. Tap "New Alarm" to add alarms
-2. Configure duration and optional name
-3. Use quick add buttons or manual time entry
-4. Reorder as needed
-5. Tap "START SEQUENCE"
+## Notes
 
-**Active Sequence Controls**
-- Pause/Resume: Temporarily halt countdown
-- Next/Prev: Navigate between alarms
-- Stop: End entire sequence
-- Dismiss: Acknowledge ringing alarm and proceed
+- The app uses a foreground service for reliable alarms. If you use battery optimization, whitelist the app for best results.
+- Alarms can override silent/DND mode if you grant permission.
+- All data is stored locally; no cloud sync or account required.
 
-**Management**
-- Arrow buttons to reorder
-- Plus button to clone
-- Trash icon to delete
-- Tap fields to edit
+---
+
+For feedback, issues, or feature requests, open an issue or contact the developer.
