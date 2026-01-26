@@ -297,7 +297,7 @@ fun SettingsScreen(
                     
                     SettingsSwitchItem(
                         title = "Enable Debug Logs",
-                        subtitle = "Write logs to disk for troubleshooting (Default OFF)",
+                        subtitle = "Write logs to disk for troubleshooting",
                         checked = debugLogsEnabled,
                         onCheckedChange = { enabled ->
                             debugLogsEnabled = enabled
