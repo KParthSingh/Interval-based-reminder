@@ -23,17 +23,28 @@ android {
     applicationVariants.all {
         outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "${name}-${defaultConfig.versionName}.apk"
+            // This will now produce filenames like "debug-3.2.0 Test Build B-DEBUG.apk"
+            output.outputFileName = "${name}-${versionName}.apk"
         }
     }
 
     buildTypes {
-        release {
+        getByName("release") {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+
+        // Added debug configuration
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-DEBUG"
+
+            // This allows you to change the app name for the debug version
+            // so you can actually tell which icon is which.
+            resValue("string", "app_name", "MedRemind-Debug")
         }
     }
 

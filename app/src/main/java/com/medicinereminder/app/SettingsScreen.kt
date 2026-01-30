@@ -7,6 +7,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import android.widget.Toast
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -309,26 +313,62 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
 
                     // Export Debug Logs
-                    SettingsClickableItem(
-                        title = "Export Debug Logs",
-                        subtitle = "Share debug log file for troubleshooting",
-                        onClick = {
-                            val exportFile = DebugLogger.exportLogs(context)
-                            if (exportFile != null) {
-                                val uri = androidx.core.content.FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    exportFile
-                                )
-                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    val clipboardManager = LocalClipboardManager.current
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val exportFile = DebugLogger.exportLogs(context)
+                                if (exportFile != null) {
+                                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        exportFile
+                                    )
+                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Export Debug Logs"))
                                 }
-                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Export Debug Logs"))
                             }
+                            .padding(horizontal = 16.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                            Text(
+                                text = "Export Debug Logs",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Share debug log file for troubleshooting",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                    )
+
+                        IconButton(
+                            onClick = {
+                                val exportFile = DebugLogger.exportLogs(context)
+                                if (exportFile != null && exportFile.exists()) {
+                                    val text = exportFile.readText()
+                                    clipboardManager.setText(AnnotatedString(text))
+                                    Toast.makeText(context, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy Logs",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     
                     HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
                     
