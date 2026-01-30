@@ -382,27 +382,7 @@ fun SettingsScreen(
                 tonalElevation = 1.dp
             ) {
                 Column {
-                    // Version info
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Version",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    
-                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+
                     
                     // GitHub Repository
                     SettingsClickableItem(
@@ -421,7 +401,7 @@ fun SettingsScreen(
                     // Releases
                     SettingsClickableItem(
                         title = "Releases",
-                        subtitle = "Download latest versions and see changelog",
+                        subtitle = "This opens GitHub Repository release page of the app. Separate option for the lazy (like me)",
                         onClick = {
                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
                                 data = android.net.Uri.parse("https://github.com/KParthSingh/Interval-based-reminder/releases")
@@ -433,6 +413,16 @@ fun SettingsScreen(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Version " + (context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }
