@@ -43,12 +43,13 @@ class AlarmRingingActivity : ComponentActivity() {
         const val ACTION_CLOSE = "com.medicinereminder.app.CLOSE_ALARM_ACTIVITY"
     }
     
-    // Receiver to handle external dismiss (from notification)
-    private val closeReceiver = object : android.content.BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == ACTION_CLOSE) {
-                // Just finish the activity, don't trigger dismiss logic
-                // (alarm was already dismissed by AlarmStopReceiver)
+    // Listener to detect when alarm is dismissed externally (via notification)
+    private var chainPrefs: android.content.SharedPreferences? = null
+    private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "is_alarm_ringing") {
+            val chainManager = ChainManager(this)
+            if (!chainManager.isAlarmRinging()) {
+                // Alarm was dismissed via notification, close this activity
                 finish()
             }
         }
@@ -57,13 +58,9 @@ class AlarmRingingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Register receiver to handle external dismiss requests
-        val filter = android.content.IntentFilter(ACTION_CLOSE)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(closeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(closeReceiver, filter)
-        }
+        // Register SharedPreferences listener to detect external dismiss
+        chainPrefs = getSharedPreferences("chain_prefs", Context.MODE_PRIVATE)
+        chainPrefs?.registerOnSharedPreferenceChangeListener(prefsListener)
         
         // Set window flags to show over lock screen and turn screen on
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -106,11 +103,7 @@ class AlarmRingingActivity : ComponentActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            unregisterReceiver(closeReceiver)
-        } catch (e: IllegalArgumentException) {
-            // Receiver was not registered
-        }
+        chainPrefs?.unregisterOnSharedPreferenceChangeListener(prefsListener)
     }
 
     private fun dismissAlarm() {
