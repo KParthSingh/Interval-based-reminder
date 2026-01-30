@@ -12,7 +12,7 @@ android {
         minSdk = 29
         targetSdk = 34
         versionCode = 30200
-        versionName = "3.2.0 Test Build B"
+        versionName = "3.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -20,11 +20,19 @@ android {
         }
     }
 
+    // Define debug build number - change this for each debug build
+    val debugBuildNumber = "TestA1"
+
     applicationVariants.all {
         outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            // This will now produce filenames like "debug-3.2.0 Test Build B-DEBUG.apk"
-            output.outputFileName = "${name}-${versionName}.apk"
+            
+            // Customize APK output filename based on build type
+            output.outputFileName = if (buildType.name == "debug") {
+                "Debug-${versionName}-${debugBuildNumber}.apk"
+            } else {
+                "RelativeTimer-${versionName}.apk"
+            }
         }
     }
 
@@ -35,16 +43,16 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Release app name - will be set to "RelativeTimer" via strings.xml
         }
 
-        // Added debug configuration
+        // Debug configuration
         getByName("debug") {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-DEBUG"
-
-            // This allows you to change the app name for the debug version
-            // so you can actually tell which icon is which.
-            resValue("string", "app_name", "MedRemind-Debug")
+            
+            // This sets the app name for the debug version
+            // When installed, the debug app will show as "RelativeTimer-Debug"
+            resValue("string", "app_name", "RelativeTimer-Debug")
         }
     }
 
