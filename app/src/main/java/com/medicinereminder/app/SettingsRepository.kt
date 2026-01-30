@@ -62,7 +62,7 @@ class SettingsRepository(context: Context) {
     }
     
     fun getDefaultAlarmTime(): Int {
-        return prefs.getInt(KEY_DEFAULT_ALARM_TIME, 300) // Default 5 minutes (not set)
+        return prefs.getInt(KEY_DEFAULT_ALARM_TIME, 0) // Default 0 (not set)
     }
     
     fun setDefaultAlarmTime(seconds: Int) {

@@ -371,6 +371,68 @@ fun SettingsScreen(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
+            
+            // About Section
+            SettingsSectionHeader("About")
+            
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    // Version info
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Version",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                    
+                    // GitHub Repository
+                    SettingsClickableItem(
+                        title = "GitHub Repository",
+                        subtitle = "View source code and contribute",
+                        onClick = {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                data = android.net.Uri.parse("https://github.com/KParthSingh/Interval-based-reminder")
+                            }
+                            context.startActivity(intent)
+                        }
+                    )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                    
+                    // Releases
+                    SettingsClickableItem(
+                        title = "Releases",
+                        subtitle = "Download latest versions and see changelog",
+                        onClick = {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                data = android.net.Uri.parse("https://github.com/KParthSingh/Interval-based-reminder/releases")
+                            }
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
