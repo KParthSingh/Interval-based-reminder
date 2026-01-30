@@ -557,10 +557,20 @@ class ChainService : Service() {
         val isChain = ChainManager(this).isChainSequence()
         if (!isChain) {
             DebugLogger.info("ChainService", "Single Alarm Mode - Stopping service after alarm")
-            val stopIntent = Intent(this, ChainService::class.java).apply {
-                action = ACTION_STOP_CHAIN
-            }
-            startService(stopIntent)
+            // Directly stop the chain instead of sending intent (more reliable)
+            ChainManager(this).stopChain()
+            
+            // Cancel all alarms defensively
+            val alarmScheduler = AlarmScheduler(this)
+            alarmScheduler.cancelAlarm(currentIndex + 1)
+            
+            // Clear notifications
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
+            notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
+            
+            DebugLogger.info("ChainService", "Single alarm mode cleanup complete, stopping service")
+            stopSelf()
             return
         }
         
@@ -601,11 +611,20 @@ class ChainService : Service() {
             DebugLogger.info("ChainService", "Next alarm started successfully")
         } else {
             DebugLogger.info("ChainService", "No more alarms, stopping chain")
-            // No more alarms, stop the chain
-            val stopIntent = Intent(this, ChainService::class.java).apply {
-                action = ACTION_STOP_CHAIN
-            }
-            startService(stopIntent)
+            // Directly stop the chain instead of sending intent (more reliable)
+            ChainManager(this).stopChain()
+            
+            // Cancel all alarms defensively
+            val alarmScheduler = AlarmScheduler(this)
+            alarmScheduler.cancelAlarm(currentIndex + 1)
+            
+            // Clear notifications
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
+            notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
+            
+            DebugLogger.info("ChainService", "Chain sequence complete, stopping service")
+            stopSelf()
         }
     }
     

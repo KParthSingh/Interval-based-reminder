@@ -12,11 +12,18 @@ android {
         minSdk = 29
         targetSdk = 34
         versionCode = 30200
-        versionName = "3.2.0 Test Build A"
+        versionName = "3.2.0 Test Build B"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    applicationVariants.all {
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "${name}-${defaultConfig.versionName}.apk"
         }
     }
 
@@ -29,24 +36,24 @@ android {
             )
         }
     }
-    
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-    
+
     kotlinOptions {
         jvmTarget = "1.8"
     }
-    
+
     buildFeatures {
         compose = true
     }
-    
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.4"
     }
-    
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
