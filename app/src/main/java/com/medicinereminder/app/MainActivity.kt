@@ -1713,11 +1713,23 @@ fun AlarmItem(
                         // Stop Button (square icon, above pause)
                         Button(
                             onClick = {
-                                // Stop the timer completely
+                                // Cancel the scheduled alarm
+                                val repository = AlarmRepository(context)
+                                val allAlarms = repository.loadAlarms()
+                                val alarmIndex = allAlarms.indexOf(alarm)
+                                val requestCode = alarmIndex + 1
+                                val alarmScheduler = AlarmScheduler(context)
+                                alarmScheduler.cancelAlarm(requestCode)
+                                
+                                // Stop ChainService (handles notification cleanup)
                                 val stopIntent = Intent(context, ChainService::class.java).apply {
                                     action = ChainService.ACTION_STOP_CHAIN
                                 }
                                 context.startService(stopIntent)
+                                
+                                // Clear alarm ringing state
+                                val chainManager = ChainManager(context)
+                                chainManager.setAlarmRinging(false)
                                 
                                 onUpdate(alarm.copy(
                                     isActive = false,
@@ -1747,7 +1759,8 @@ fun AlarmItem(
                         // Play/Pause Button (Icon only)
                         Button(
                             onClick = {
-                                when (alarm.state) {
+                                // Use effectiveState (derived from chainState) as source of truth
+                                when (effectiveState) {
                                     AlarmState.RESET -> {
                                         // Starting from reset state
                                         val delay = alarm.getTotalSeconds() * 1000L
@@ -1763,46 +1776,24 @@ fun AlarmItem(
                                         ))
                                     }
                                     AlarmState.PAUSED -> {
-                                        // Resuming from paused state - use remaining time
-                                        val delay = alarm.pausedRemainingMs
-                                        val now = System.currentTimeMillis()
+                                        // Resuming from paused state
+                                        DebugLogger.info("AlarmItem", "RESUME clicked - sending ACTION_RESUME_CHAIN")
                                         
-                                        DebugLogger.info("AlarmItem", "RESUME clicked - remaining: ${delay}ms")
-                                        
-                                        // CRITICAL: Tell ChainService to resume (syncs notification)
+                                        // Tell ChainService to resume (it handles rescheduling and notification sync)
                                         val resumeIntent = Intent(context, ChainService::class.java).apply {
                                             action = ChainService.ACTION_RESUME_CHAIN
                                         }
                                         context.startService(resumeIntent)
-                                        
-                                        // Update local alarm state
-                                        onUpdate(alarm.copy(
-                                            isActive = true,
-                                            scheduledTime = now + delay,
-                                            state = AlarmState.RUNNING,
-                                            startTime = now,
-                                            totalDuration = alarm.totalDuration, // Keep original total duration
-                                            pausedRemainingMs = 0L // Clear paused time
-                                        ))
                                     }
                                     AlarmState.RUNNING -> {
-                                        // Pausing - calculate and store remaining time
-                                        val remaining = (alarm.scheduledTime - System.currentTimeMillis()).coerceAtLeast(0)
+                                        // Pausing
+                                        DebugLogger.info("AlarmItem", "PAUSE clicked - sending ACTION_PAUSE_CHAIN")
                                         
-                                        DebugLogger.info("AlarmItem", "PAUSE clicked - remaining: ${remaining}ms")
-                                        
-                                        // CRITICAL: Tell ChainService to pause (syncs notification)
+                                        // Tell ChainService to pause (it handles state and notification sync)
                                         val pauseIntent = Intent(context, ChainService::class.java).apply {
                                             action = ChainService.ACTION_PAUSE_CHAIN
                                         }
                                         context.startService(pauseIntent)
-                                        
-                                        // Update local alarm state
-                                        onUpdate(alarm.copy(
-                                            isActive = false,
-                                            state = AlarmState.PAUSED,
-                                            pausedRemainingMs = remaining
-                                        ))
                                     }
                                     AlarmState.EXPIRED -> {
                                         // Reset when expired
@@ -1821,7 +1812,7 @@ fun AlarmItem(
                             modifier = Modifier.size(80.dp)
                         ) {
                             Icon(
-                                imageVector = when (alarm.state) {
+                                imageVector = when (effectiveState) {
                                     AlarmState.RESET, AlarmState.PAUSED -> Icons.Outlined.PlayArrow
                                     AlarmState.RUNNING -> Icons.Outlined.Pause
                                     AlarmState.EXPIRED -> Icons.Outlined.Refresh
