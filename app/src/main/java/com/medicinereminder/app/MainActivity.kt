@@ -2253,6 +2253,22 @@ fun UnifiedAlarmDialog(
                         seconds = s
                     }
                 )
+                
+                // Show trigger time below duration picker
+                val totalSeconds = hours * 3600 + minutes * 60 + seconds
+                if (totalSeconds > 0) {
+                    val triggerTime = System.currentTimeMillis() + (totalSeconds * 1000L)
+                    val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+                    val formattedTime = timeFormat.format(Date(triggerTime))
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = "Rings at $formattedTime",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         },
         confirmButton = {
