@@ -564,6 +564,14 @@ class ChainService : Service() {
             val alarmScheduler = AlarmScheduler(this)
             alarmScheduler.cancelAlarm(currentIndex + 1)
             
+            // CRITICAL FIX: Clear alarm active states in repository
+            // This ensures the Start Sequence button is re-enabled when app is reopened
+            val repository = AlarmRepository(this)
+            val alarms = repository.loadAlarms()
+            val clearedAlarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
+            repository.saveAlarms(clearedAlarms)
+            DebugLogger.info("ChainService", "All alarms cleared (single alarm mode)")
+            
             // Clear notifications
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
@@ -617,6 +625,12 @@ class ChainService : Service() {
             // Cancel all alarms defensively
             val alarmScheduler = AlarmScheduler(this)
             alarmScheduler.cancelAlarm(currentIndex + 1)
+            
+            // CRITICAL FIX: Clear alarm active states in repository
+            // This ensures the Start Sequence button is re-enabled when app is reopened
+            val clearedAlarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
+            repository.saveAlarms(clearedAlarms)
+            DebugLogger.info("ChainService", "All alarms cleared (chain sequence complete)")
             
             // Clear notifications
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager

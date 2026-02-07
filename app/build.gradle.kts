@@ -21,7 +21,7 @@ android {
         }
     }
 
-    val debugBuildNumber = "Dev"
+    val debugBuildNumber = "DevB"
 
     applicationVariants.all {
         outputs.all {

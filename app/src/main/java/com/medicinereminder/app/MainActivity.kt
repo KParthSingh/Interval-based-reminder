@@ -555,7 +555,6 @@ fun MainScreen(
                 }
             } else if (alarms.isNotEmpty()) {
                 // Persistent Start Button at bottom - fills entire bottom bar
-                val anyActive = alarms.any { it.isActive }
                 val settingsRepository = remember { SettingsRepository(context) }
                 Column(modifier = Modifier.navigationBarsPadding()) {
                     Surface(
@@ -564,12 +563,44 @@ fun MainScreen(
                     ) {
                     Button(
                         onClick = {
+                            // DEFENSIVE: Clear any leftover state before starting new chain
+                            // This handles edge cases where state is out of sync
+                            
+                            // 1. Stop ChainService directly (don't use startService which causes foreground issues)
+                            context.stopService(Intent(context, ChainService::class.java))
+                            
+                            // 2. Stop AlarmService if ringing
+                            context.stopService(Intent(context, AlarmService::class.java))
+                            
+                            // 3. Clear ChainManager state
+                            chainManager.stopChain()
+                            chainManager.setAlarmRinging(false)
+                            
+                            // 4. Cancel all scheduled alarms
+                            val alarmScheduler = AlarmScheduler(context)
+                            alarms.forEachIndexed { index, _ ->
+                                alarmScheduler.cancelAlarm(index + 1)
+                            }
+                            
+                            // 5. Reset all alarms to inactive state
+                            alarms.forEachIndexed { index, alarm ->
+                                if (alarm.isActive || alarm.scheduledTime != 0L) {
+                                    alarms[index] = alarm.copy(isActive = false, scheduledTime = 0L)
+                                }
+                            }
+                            
+                            // 6. Clear notifications
+                            val notificationManager = context.getSystemService(android.app.NotificationManager::class.java)
+                            notificationManager?.cancel(NotificationHelper.NOTIFICATION_ID)
+                            notificationManager?.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
+                            
+                            // Now start the new chain
                             chainManager.startChain()
                             val firstAlarm = alarms[0]
                             val delay = firstAlarm.getTotalSeconds() * 1000L
                             onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size, true)
                             
-                            // efficient update
+                            // Mark first alarm as active
                             alarms[0] = firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay)
                             saveAlarms() // Save on start
                             
@@ -583,7 +614,6 @@ fun MainScreen(
                                 context.startActivity(homeIntent)
                             }
                         },
-                        enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(72.dp),
@@ -2237,6 +2267,16 @@ fun UnifiedAlarmDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    // Validate that duration is not 0:00
+                    if (hours == 0 && minutes == 0 && seconds == 0) {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Alarm duration cannot be 0:00",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        return@Button
+                    }
+                    
                     val resultAlarm = if (alarm != null) {
                         // Editing existing alarm
                         alarm.copy(
