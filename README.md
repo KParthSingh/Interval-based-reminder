@@ -1,5 +1,4 @@
-# Relative Interval timer app
-Interval‑based reminder app for Android.
+# Relarm. A relative alarm app
 
 > **WARNING: This was created with help of AI**
 > 
@@ -53,7 +52,7 @@ Workout timer apps -> Great for intervals but no snooze/dismiss logic, useless f
 
 ## App Overview
 
-Relative Interval Timer lets you create flexible chains of alarms/reminders that trigger at intervals you define, starting from any time you choose.
+Relarm lets you create flexible chains of alarms/reminders that trigger at intervals you define, starting from any time you choose.
 
 ## Main Features
 
